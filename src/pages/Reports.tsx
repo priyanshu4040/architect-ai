@@ -67,7 +67,7 @@ export default function Reports() {
     URL.revokeObjectURL(url);
   };
 
-  const toSimplePdfBytes = (text: string): Uint8Array => {
+  const toSimplePdfBytes = (text: string): Uint8Array<ArrayBuffer> => {
     const safe = text
       .replace(/\r/g, "")
       .split("\n")
