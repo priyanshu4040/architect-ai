@@ -16,17 +16,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { loadLastResult } from "@/lib/api";
-import DependencyGraph from "@/components/visualization/DependencyGraph";
-
-interface ArchNode {
-  id: string;
-  name: string;
-  layer: "presentation" | "business" | "data" | "infrastructure";
-  type: string;
-  functionality: string;
-  risk?: "high" | "medium" | "low";
-  connections: string[];
-}
+import DependencyGraph, { type ArchNode } from "@/components/visualization/DependencyGraph";
 
 function fallbackLayerFromType(t: string): ArchNode["layer"] {
   const x = (t || "").toLowerCase();
