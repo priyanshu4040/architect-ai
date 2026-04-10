@@ -137,7 +137,7 @@ export default function Reports() {
       }
 
       const pdfBytes = toSimplePdfBytes(reportMd);
-      downloadBlob(pdfBytes, "application/pdf", "architecture-report.pdf");
+      downloadBlob(new Blob([pdfBytes], { type: "application/pdf" }), "application/pdf", "architecture-report.pdf");
     }, 400);
   };
 
