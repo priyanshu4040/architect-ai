@@ -8,60 +8,39 @@
 
 @layer base {
   :root {
-    /* Dark theme as default - tech-focused aesthetic */
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222 47% 8%;
-    --popover-foreground: 210 40% 98%;
-
-    /* Electric blue primary */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
     --primary: 199 89% 48%;
-    --primary-foreground: 222 47% 6%;
-
-    /* Muted teal secondary */
-    --secondary: 199 40% 16%;
-    --secondary-foreground: 199 89% 70%;
-
-    --muted: 222 30% 14%;
-    --muted-foreground: 215 20% 55%;
-
-    /* Cyan accent */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 199 30% 92%;
+    --secondary-foreground: 199 50% 30%;
+    --muted: 210 30% 93%;
+    --muted-foreground: 215 16% 47%;
     --accent: 185 100% 42%;
-    --accent-foreground: 222 47% 6%;
-
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
-
-    /* Success state */
     --success: 142 76% 36%;
     --success-foreground: 210 40% 98%;
-
-    /* Warning state */
     --warning: 38 92% 50%;
     --warning-foreground: 222 47% 6%;
-
-    --border: 217 30% 18%;
-    --input: 217 30% 18%;
+    --border: 214 20% 85%;
+    --input: 214 20% 85%;
     --ring: 199 89% 48%;
-
     --radius: 0.75rem;
-
-    /* Custom glow effects */
     --glow-primary: 199 89% 48%;
     --glow-accent: 185 100% 42%;
-
-    /* Sidebar */
-    --sidebar-background: 222 47% 7%;
-    --sidebar-foreground: 210 40% 90%;
+    --sidebar-background: 210 30% 96%;
+    --sidebar-foreground: 222 47% 20%;
     --sidebar-primary: 199 89% 48%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 199 40% 16%;
-    --sidebar-accent-foreground: 199 89% 70%;
-    --sidebar-border: 217 30% 18%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 199 30% 92%;
+    --sidebar-accent-foreground: 199 50% 30%;
+    --sidebar-border: 214 20% 85%;
     --sidebar-ring: 199 89% 48%;
   }
 
@@ -82,9 +61,23 @@
     --accent-foreground: 222 47% 6%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 6%;
     --border: 217 30% 18%;
     --input: 217 30% 18%;
     --ring: 199 89% 48%;
+    --glow-primary: 199 89% 48%;
+    --glow-accent: 185 100% 42%;
+    --sidebar-background: 222 47% 7%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 199 89% 48%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 199 40% 16%;
+    --sidebar-accent-foreground: 199 89% 70%;
+    --sidebar-border: 217 30% 18%;
+    --sidebar-ring: 199 89% 48%;
   }
 }
 
