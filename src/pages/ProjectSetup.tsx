@@ -434,7 +434,7 @@ function StepRequirements({ state, updateState }: { state: WizardState; updateSt
                   className="flex-1"
                 />
                 <span className="w-12 text-right text-sm text-foreground">
-                  {state[item.key as keyof WizardState]}%
+                  {String(state[item.key as keyof WizardState])}%
                 </span>
               </div>
             ))}
@@ -488,7 +488,7 @@ function StepReview({ state }: { state: WizardState }) {
               {["scalability", "performance", "maintainability", "security"].map((key) => (
                 <div key={key} className="p-3 rounded-lg bg-secondary/30 border border-border/50 text-center">
                   <p className="text-xs text-muted-foreground capitalize">{key}</p>
-                  <p className="text-lg font-semibold text-primary">{state[key as keyof WizardState]}%</p>
+                  <p className="text-lg font-semibold text-primary">{String(state[key as keyof WizardState])}%</p>
                 </div>
               ))}
             </div>

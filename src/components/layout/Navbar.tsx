@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Brain, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useState } from "react";
 
 const navLinks = [
@@ -66,7 +67,8 @@ export function Navbar() {
           </nav>
 
           {/* CTA Button */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2">
+            <ThemeToggle />
             <Button variant="hero" size="sm" asChild>
               <Link to="/setup">Start Planning</Link>
             </Button>
@@ -107,11 +109,14 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <Button variant="hero" className="mt-2" asChild>
-              <Link to="/setup" onClick={() => setIsMenuOpen(false)}>
-                Start Planning
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2 mt-2">
+              <ThemeToggle />
+              <Button variant="hero" className="flex-1" asChild>
+                <Link to="/setup" onClick={() => setIsMenuOpen(false)}>
+                  Start Planning
+                </Link>
+              </Button>
+            </div>
           </nav>
         </motion.div>
       )}
