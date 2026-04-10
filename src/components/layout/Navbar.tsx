@@ -109,11 +109,14 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <Button variant="hero" className="mt-2" asChild>
-              <Link to="/setup" onClick={() => setIsMenuOpen(false)}>
-                Start Planning
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2 mt-2">
+              <ThemeToggle />
+              <Button variant="hero" className="flex-1" asChild>
+                <Link to="/setup" onClick={() => setIsMenuOpen(false)}>
+                  Start Planning
+                </Link>
+              </Button>
+            </div>
           </nav>
         </motion.div>
       )}
