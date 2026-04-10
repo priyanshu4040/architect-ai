@@ -100,9 +100,12 @@ const layers = [
 
 export default function Visualization() {
   const last = loadLastResult();
+  const analysisMode = last?.mode || null;
   const backendNodes =
     last?.graph?.nodes?.length ? graphToArchNodes(last.graph as any) : null;
-  const arch = backendNodes || mockArchitecture;
+  const arch =
+    backendNodes ||
+    (analysisMode === "brownfield" ? [] : mockArchitecture);
 
   const [selectedNode, setSelectedNode] = useState<ArchNode | null>(null);
   const [zoom, setZoom] = useState(100);

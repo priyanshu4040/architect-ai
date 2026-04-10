@@ -30,9 +30,28 @@ export interface AnalyzeResponse {
   memory_used: string;
   warning: string;
   results?: AnalyzeResults | null;
+  report_document?: string;
 }
 
 export type AnalyzeResults = {
+  current_codebase_faults?: {
+    fault: string;
+    severity: "high" | "medium" | "low" | string;
+    evidence: string;
+    impact: string;
+  }[];
+  comparison_old_vs_new?: {
+    dimension: string;
+    current_state: string;
+    proposed_state: string;
+    benefit: string;
+  }[];
+  expected_improvements?: {
+    metric: "maintainability" | "scalability" | "performance" | "security" | "delivery_speed" | string;
+    current_baseline: string;
+    target_outcome: string;
+    why_it_improves: string;
+  }[];
   component_details?: {
     component: string;
     functionality: string;

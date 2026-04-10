@@ -28,7 +28,8 @@ def architecture_agent(state: AgentState) -> AgentState:
     OR an existing code analysis report (Brownfield) 
     and returns a system architecture plan.
     """
-    if state["mode"] == "greenfield":
+    mode = state["mode"]
+    if mode == "greenfield":
         print("\n[Architecture Agent] Designing from scratch (Greenfield)...")
         # In orchestrated mode, `analysis_report` is produced first by `analysis_agent`.
         analysis = (state.get("analysis_report") or "").strip()
@@ -41,6 +42,38 @@ def architecture_agent(state: AgentState) -> AgentState:
         context = f"Existing Codebase Analysis Report:\n{state['analysis_report']}\n\nExisting AST Structure:\n{state.get('ast_summary', '')}"
 
     past_memory = state.get("past_memory", "No past memory found.")
+
+    brownfield_extra_keys = (
+        "    \"current_codebase_faults\": [\n"
+        "      {\n"
+        "        \"fault\": \"string\",\n"
+        "        \"severity\": \"high|medium|low\",\n"
+        "        \"evidence\": \"string\",\n"
+        "        \"impact\": \"string\"\n"
+        "      }\n"
+        "    ],\n"
+        "    \"comparison_old_vs_new\": [\n"
+        "      {\n"
+        "        \"dimension\": \"string\",\n"
+        "        \"current_state\": \"string\",\n"
+        "        \"proposed_state\": \"string\",\n"
+        "        \"benefit\": \"string\"\n"
+        "      }\n"
+        "    ],\n"
+        "    \"expected_improvements\": [\n"
+        "      {\n"
+        "        \"metric\": \"maintainability|scalability|performance|security|delivery_speed\",\n"
+        "        \"current_baseline\": \"string\",\n"
+        "        \"target_outcome\": \"string\",\n"
+        "        \"why_it_improves\": \"string\"\n"
+        "      }\n"
+        "    ],\n"
+    ) if mode == "brownfield" else ""
+    brownfield_rule = (
+        "- For brownfield mode, include concrete current_codebase_faults, comparison_old_vs_new, and expected_improvements.\n"
+        if mode == "brownfield"
+        else ""
+    )
 
     prompt = (
         "You are an expert software architect.\n\n"
@@ -59,6 +92,7 @@ def architecture_agent(state: AgentState) -> AgentState:
         "```json\n"
         "{\n"
         "  \"results\": {\n"
+        f"{brownfield_extra_keys}"
         "    \"component_details\": [\n"
         "      {\n"
         "        \"component\": \"string\",\n"
@@ -125,6 +159,7 @@ def architecture_agent(state: AgentState) -> AgentState:
         "```\n\n"
         "Rules for JSON:\n"
         "- Use integers 0-100 for indicators and confidence.\n"
+        f"{brownfield_rule}"
         "- component_details must include every major component from the decomposition and Mermaid graph.\n"
         "- functionality must be concrete and specific (avoid generic labels like 'handles logic').\n"
         "- component_layer_mapping must include every major component from the decomposition and Mermaid graph.\n"

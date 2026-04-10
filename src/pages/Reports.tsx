@@ -40,6 +40,10 @@ export default function Reports() {
   };
 
   const buildReportMarkdown = (): string => {
+    const detailedDoc = sanitizeReportContent(last?.report_document || "");
+    if (detailedDoc) {
+      return detailedDoc;
+    }
     const safeAnalysis = sanitizeReportContent(last?.analysis_report || "No analysis report found.");
     const safePlan = sanitizeReportContent(last?.architecture_plan || "No architecture plan found.");
     return (

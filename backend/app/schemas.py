@@ -54,4 +54,5 @@ class AnalyzeResponse(BaseModel):
     memory_used: str = ""
     warning: str = ""
     results: Optional[Dict[str, Any]] = None
+    report_document: str = ""
 
