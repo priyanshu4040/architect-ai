@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
+import { analyze, saveLastResult } from "@/lib/api";
+import { toast } from "sonner";
 
 type ProjectMode = "greenfield" | "brownfield";
 type ProjectDomain = "web-app" | "api" | "distributed" | null;
@@ -88,7 +90,23 @@ export default function ProjectSetup() {
   };
 
   const handleSubmit = () => {
-    navigate("/dashboard");
+    const mode = state.mode;
+    if (!mode) return;
+
+    const input =
+      mode === "greenfield"
+        ? state.functionalRequirements
+        : state.repositoryUrl;
+
+    analyze({ mode, input })
+      .then((result) => {
+        saveLastResult(result);
+        navigate("/dashboard");
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : "Analysis failed";
+        toast.error(message);
+      });
   };
 
   return (

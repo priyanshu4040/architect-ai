@@ -15,6 +15,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { loadLastResult } from "@/lib/api";
 
 type AgentStatus = "idle" | "running" | "complete";
 
@@ -70,8 +71,8 @@ export default function Dashboard() {
   const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
-    // Simulate agent workflow
     const runAgents = async () => {
+      const last = loadLastResult();
       // Start Analysis Agent
       setAgents(prev => ({
         ...prev,
@@ -100,11 +101,15 @@ export default function Dashboard() {
           ...prev.analysisAgent, 
           status: "complete",
           currentTask: "Analysis complete",
-          outputs: [
-            "Identified 3-tier architecture pattern",
-            "Found 12 primary modules",
-            "Detected 3 potential bottlenecks",
-          ]
+          outputs: last?.analysis_report
+            ? last.analysis_report
+                .split("\n")
+                .map((l) => l.trim())
+                .filter(Boolean)
+                .slice(0, 5)
+            : [
+                "No analysis report found. Run an analysis from Project Setup.",
+              ],
         }
       }));
       addTimelineEvent("Analysis Agent completed", "analysis");
@@ -137,11 +142,15 @@ export default function Dashboard() {
           ...prev.planningAgent, 
           status: "complete",
           currentTask: "Planning complete",
-          outputs: [
-            "Recommended: Microservices migration",
-            "Priority: Database layer refactoring",
-            "Created 6-month evolution roadmap",
-          ]
+          outputs: last?.architecture_plan
+            ? last.architecture_plan
+                .split("\n")
+                .map((l) => l.trim())
+                .filter(Boolean)
+                .slice(0, 5)
+            : [
+                "No architecture plan found. Run an analysis from Project Setup.",
+              ],
         }
       }));
       addTimelineEvent("Planning Agent completed", "planning");

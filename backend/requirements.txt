@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+langgraph
+langchain-community
+langchain-groq
+langchain-chroma
+langchain-ollama
+langchain-text-splitters
+

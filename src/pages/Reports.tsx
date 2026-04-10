@@ -9,6 +9,7 @@ import {
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
+import { loadLastResult } from "@/lib/api";
 
 const reportSections = [
   { title: "Executive Summary", pages: 2, included: true },
@@ -23,15 +24,30 @@ const reportSections = [
 
 export default function Reports() {
   const [isDownloading, setIsDownloading] = useState(false);
+  const last = loadLastResult();
 
   const handleDownload = () => {
     setIsDownloading(true);
-    // Simulate download
     setTimeout(() => {
       setIsDownloading(false);
-      // In a real app, this would trigger actual PDF download
-      alert("Report download would start here!");
-    }, 2000);
+
+      const content =
+        `# Architecture Analysis Report\n\n` +
+        `## Mode\n${last?.mode || "N/A"}\n\n` +
+        (last?.warning ? `## Warning\n${last.warning}\n\n` : "") +
+        `## Analysis Report\n${last?.analysis_report || "No analysis report found."}\n\n` +
+        `## Architecture Plan\n${last?.architecture_plan || "No architecture plan found."}\n`;
+
+      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "architecture-report.md";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 400);
   };
 
   const totalPages = reportSections.reduce((acc, section) => acc + section.pages, 0);

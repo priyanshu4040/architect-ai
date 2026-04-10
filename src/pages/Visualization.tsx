@@ -15,6 +15,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { loadLastResult } from "@/lib/api";
 
 interface ArchNode {
   id: string;
@@ -23,6 +24,31 @@ interface ArchNode {
   type: string;
   risk?: "high" | "medium" | "low";
   connections: string[];
+}
+
+function graphToArchNodes(graph: { nodes: { id: string; label: string; type?: string | null }[]; edges: { source: string; target: string }[] }): ArchNode[] {
+  const byId = new Map<string, ArchNode>();
+  for (const n of graph.nodes || []) {
+    // Best-effort layer/type mapping from backend graph
+    const t = (n.type || "component").toString();
+    const layer =
+      t.includes("file") ? "presentation" :
+      t.includes("class") ? "business" :
+      t.includes("external") ? "infrastructure" :
+      "business";
+    byId.set(n.id, {
+      id: n.id,
+      name: n.label || n.id,
+      layer,
+      type: t,
+      connections: [],
+    });
+  }
+  for (const e of graph.edges || []) {
+    const src = byId.get(e.source);
+    if (src) src.connections.push(e.target);
+  }
+  return Array.from(byId.values());
 }
 
 const mockArchitecture: ArchNode[] = [
@@ -55,6 +81,11 @@ const layers = [
 ];
 
 export default function Visualization() {
+  const last = loadLastResult();
+  const backendNodes =
+    last?.graph?.nodes?.length ? graphToArchNodes(last.graph as any) : null;
+  const arch = backendNodes || mockArchitecture;
+
   const [selectedNode, setSelectedNode] = useState<ArchNode | null>(null);
   const [zoom, setZoom] = useState(100);
   const [expandedLayers, setExpandedLayers] = useState<string[]>(layers.map(l => l.id));
@@ -68,7 +99,7 @@ export default function Visualization() {
   };
 
   const getNodesByLayer = (layerId: string) => 
-    mockArchitecture.filter(node => node.layer === layerId);
+    arch.filter(node => node.layer === layerId);
 
   return (
     <div className="min-h-screen bg-background">
@@ -141,9 +172,9 @@ export default function Visualization() {
                           <div className="flex items-center gap-3">
                             <Layers className="h-5 w-5 text-foreground" />
                             <span className="font-medium text-foreground">{layer.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              ({getNodesByLayer(layer.id).length} components)
-                            </span>
+                        <span className="text-xs text-muted-foreground">
+                          ({getNodesByLayer(layer.id).length} components)
+                        </span>
                           </div>
                           {expandedLayers.includes(layer.id) ? (
                             <ChevronUp className="h-5 w-5 text-muted-foreground" />
@@ -229,7 +260,7 @@ export default function Visualization() {
                         <div className="space-y-1">
                           {selectedNode.connections.length > 0 ? (
                             selectedNode.connections.map((connId) => {
-                              const connected = mockArchitecture.find(n => n.id === connId);
+                              const connected = arch.find(n => n.id === connId);
                               return connected ? (
                                 <div key={connId} className="flex items-center gap-2 text-sm">
                                   <Link2 className="h-3 w-3 text-primary" />
@@ -255,7 +286,7 @@ export default function Visualization() {
             {/* Dependency Graph View */}
             <TabsContent value="dependencies">
               <div className="glass-card p-8">
-                <DependencyGraph nodes={mockArchitecture} selectedNode={selectedNode} onSelectNode={setSelectedNode} />
+                <DependencyGraph nodes={arch} selectedNode={selectedNode} onSelectNode={setSelectedNode} />
               </div>
             </TabsContent>
           </Tabs>

@@ -12,6 +12,21 @@ dist
 dist-ssr
 *.local
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Local agent artifacts
+chroma_db/
+dependency_graph.html
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
