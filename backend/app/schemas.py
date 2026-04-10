@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -28,6 +28,8 @@ class GraphNode(BaseModel):
     id: str
     label: str
     type: Optional[str] = None
+    layer: Optional[Literal["presentation", "business", "data", "infrastructure"]] = None
+    functionality: Optional[str] = None
     description: Optional[str] = None
     group: Optional[int] = None
 
@@ -51,4 +53,5 @@ class AnalyzeResponse(BaseModel):
     graph: GraphPayload = Field(default_factory=GraphPayload)
     memory_used: str = ""
     warning: str = ""
+    results: Optional[Dict[str, Any]] = None
 

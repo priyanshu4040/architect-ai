@@ -11,6 +11,56 @@ import re
 import webbrowser
 
 
+def _layer_from_type(ntype: str) -> str:
+    t = (ntype or "").strip().lower()
+    if t in {"controller", "api", "gateway", "handler", "ui", "view", "page", "screen", "frontend"}:
+        return "presentation"
+    if t in {"repository", "database", "cache"}:
+        return "data"
+    if t in {"client", "queue", "storage", "external", "file"}:
+        return "infrastructure"
+    return "business"
+
+
+def _classify_component(label: str) -> tuple[str, int, str]:
+    """
+    Classify a component label into a coarse type + group.
+
+    Returns (type, group, description).
+    - type is a short string used by the frontend to map to layers.
+    - group is a small int for optional visualization grouping.
+    """
+    raw = (label or "").strip()
+    l = raw.lower()
+
+    # Presentation layer
+    if any(k in l for k in ("controller", "router", "handler", "api", "gateway", "ui", "view", "page", "screen", "frontend")):
+        return ("controller", 1, "Presentation/API surface")
+
+    # Data layer
+    if any(k in l for k in ("repository", " repo", "repo", "dao", "db", "database", "model", "orm", "query", "cache", "redis")):
+        # keep more specific types when possible
+        if "cache" in l or "redis" in l:
+            return ("cache", 3, "Cache/data access")
+        if "db" in l or "database" in l:
+            return ("database", 3, "Database/data access")
+        return ("repository", 3, "Data access")
+
+    # Infrastructure layer
+    if any(k in l for k in ("client", "sdk", "adapter", "queue", "kafka", "rabbit", "s3", "storage", "mailer", "logger", "metrics", "config", "external")):
+        if any(k in l for k in ("queue", "kafka", "rabbit")):
+            return ("queue", 4, "Messaging/queue infrastructure")
+        if any(k in l for k in ("storage", "s3")):
+            return ("storage", 4, "Storage infrastructure")
+        return ("client", 4, "External/infrastructure integration")
+
+    # Default business layer
+    if any(k in l for k in ("service", "manager", "usecase", "use_case", "domain", "policy", "workflow")):
+        return ("service", 2, "Business logic")
+
+    return ("component", 2, _smart_label(raw))
+
+
 def parse_mermaid_to_graph(text: str) -> dict:
     """
     Extracts a Mermaid graph TD block from LLM output and parses it into
@@ -38,9 +88,22 @@ def parse_mermaid_to_graph(text: str) -> dict:
     def get_or_create(node_id: str, hint_label: str = None):
         label = hint_label.strip() if hint_label else node_id
         if node_id not in nodes:
-            nodes[node_id] = {"id": node_id, "label": label}
+            ntype, group, desc = _classify_component(label)
+            nodes[node_id] = {
+                "id": node_id,
+                "label": label,
+                "type": ntype,
+                "layer": _layer_from_type(ntype),
+                "description": desc,
+                "group": group,
+            }
         elif hint_label:
             nodes[node_id]["label"] = label
+            ntype, group, desc = _classify_component(label)
+            nodes[node_id]["type"] = ntype
+            nodes[node_id]["layer"] = _layer_from_type(ntype)
+            nodes[node_id]["description"] = desc
+            nodes[node_id]["group"] = group
 
     for line in mermaid_code.splitlines():
         line = line.strip()
@@ -98,12 +161,14 @@ def parse_text_to_graph(text: str, *, max_nodes: int = 60) -> dict:
         if not node_id:
             node_id = f"node_{len(nodes) + 1}"
         if node_id not in nodes:
+            ntype, group, desc = _classify_component(label)
             nodes[node_id] = {
                 "id": node_id,
                 "label": label,
-                "type": "class",
-                "description": _smart_label(label),
-                "group": 2,
+                "type": ntype,
+                "layer": _layer_from_type(ntype),
+                "description": desc,
+                "group": group,
             }
         return node_id
 
@@ -163,7 +228,7 @@ def parse_ast_summary_to_graph(ast_summary: str) -> dict:
     def add_node(node_id: str, label: str, ntype: str, group: int):
         if node_id not in nodes:
             nodes[node_id] = {"id": node_id, "label": label, "type": ntype,
-                              "description": ntype.capitalize(), "group": group}
+                              "layer": _layer_from_type(ntype), "description": ntype.capitalize(), "group": group}
 
     for line in ast_summary.splitlines():
         line = line.strip()
@@ -190,7 +255,9 @@ def parse_ast_summary_to_graph(ast_summary: str) -> dict:
                     cls_name  = inherit_match.group(1).strip()
                     bases     = [b.strip() for b in inherit_match.group(2).split(",")]
                     cls_id    = f"class::{cls_name}"
-                    add_node(cls_id, cls_name, "class", 2)
+                    inferred_type, inferred_group, inferred_desc = _classify_component(cls_name)
+                    add_node(cls_id, cls_name, inferred_type, inferred_group)
+                    nodes[cls_id]["description"] = inferred_desc
                     edges.append({"source": file_id, "target": cls_id, "label": "contains"})
                     for base in bases:
                         base_id = f"class::{base}"
@@ -206,7 +273,9 @@ def parse_ast_summary_to_graph(ast_summary: str) -> dict:
                     if cls_name:
                         cls_name = cls_name.group(1)
                         cls_id   = f"class::{cls_name}"
-                        add_node(cls_id, cls_name, "class", 2)
+                        inferred_type, inferred_group, inferred_desc = _classify_component(cls_name)
+                        add_node(cls_id, cls_name, inferred_type, inferred_group)
+                        nodes[cls_id]["description"] = inferred_desc
                         edges.append({"source": file_id, "target": cls_id, "label": "contains"})
 
         # Imports line — file -> module dependency

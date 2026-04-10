@@ -1,5 +1,9 @@
 import os
+import tempfile
+import zipfile
 from typing import List
+
+from fastapi import File, UploadFile
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -100,6 +104,60 @@ def brownfield(payload: BrownfieldRequest):
 @app.post("/brownfield", response_model=AnalyzeResponse)
 def brownfield_alias(payload: BrownfieldRequest):
     return brownfield(payload)
+
+
+def _safe_extract_zip(zip_path: str, extract_dir: str) -> None:
+    """
+    Prevent Zip Slip by ensuring all extracted paths stay within extract_dir.
+    """
+    with zipfile.ZipFile(zip_path) as zf:
+        for member in zf.infolist():
+            # Skip directories implicitly handled by ZipFile
+            member_path = os.path.normpath(member.filename)
+            if os.path.isabs(member_path) or member_path.startswith(".."):
+                raise ValueError("Unsafe zip entry path.")
+            dest_path = os.path.normpath(os.path.join(extract_dir, member_path))
+            if not dest_path.startswith(os.path.normpath(extract_dir)):
+                raise ValueError("Unsafe zip entry path.")
+        zf.extractall(extract_dir)
+
+
+@app.post("/api/brownfield/zip", response_model=AnalyzeResponse)
+async def brownfield_zip(file: UploadFile = File(...)):
+    """
+    Upload a .zip of a codebase, extract to a temp folder, and run brownfield analysis.
+    """
+    filename = (file.filename or "").lower()
+    if not filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Please upload a .zip file.")
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="architect_ai_zip_") as td:
+            zip_path = os.path.join(td, "codebase.zip")
+            content = await file.read()
+            with open(zip_path, "wb") as wf:
+                wf.write(content)
+
+            extract_dir = os.path.join(td, "extracted")
+            os.makedirs(extract_dir, exist_ok=True)
+            _safe_extract_zip(zip_path, extract_dir)
+
+            # If zip contains a single top-level folder, analyze that folder.
+            entries = [e for e in os.listdir(extract_dir) if e and not e.startswith(".")]
+            root = extract_dir
+            if len(entries) == 1:
+                candidate = os.path.join(extract_dir, entries[0])
+                if os.path.isdir(candidate):
+                    root = candidate
+
+            result = run_analysis("brownfield", root)
+            return AnalyzeResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(status_code=400, detail="Invalid zip file.") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Brownfield zip failed: {exc}") from exc
 
 
 @app.post("/api/memory/train")

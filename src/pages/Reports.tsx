@@ -24,29 +24,116 @@ const reportSections = [
 
 export default function Reports() {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showDownloadOptions, setShowDownloadOptions] = useState(false);
   const last = loadLastResult();
 
-  const handleDownload = () => {
+  const sanitizeReportContent = (raw: string): string => {
+    if (!raw) return "";
+    return raw
+      // Remove Mermaid graph blocks
+      .replace(/```mermaid[\s\S]*?```/gi, "")
+      // Remove JSON output blocks
+      .replace(/```json[\s\S]*?```/gi, "")
+      // Remove excessive blank lines introduced after stripping blocks
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
+
+  const buildReportMarkdown = (): string => {
+    const safeAnalysis = sanitizeReportContent(last?.analysis_report || "No analysis report found.");
+    const safePlan = sanitizeReportContent(last?.architecture_plan || "No architecture plan found.");
+    return (
+      `# Architecture Analysis Report\n\n` +
+      `## Mode\n${last?.mode || "N/A"}\n\n` +
+      (last?.warning ? `## Warning\n${last.warning}\n\n` : "") +
+      `## Analysis Report\n${safeAnalysis}\n\n` +
+      `## Architecture Plan\n${safePlan}\n`
+    );
+  };
+
+  const downloadBlob = (content: BlobPart, mime: string, filename: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const toSimplePdfBytes = (text: string): Uint8Array => {
+    const safe = text
+      .replace(/\r/g, "")
+      .split("\n")
+      .map((line) =>
+        line
+          .replace(/\\/g, "\\\\")
+          .replace(/\(/g, "\\(")
+          .replace(/\)/g, "\\)")
+          .slice(0, 110)
+      );
+
+    let y = 800;
+    const lineHeight = 14;
+    const streamLines = ["BT", "/F1 10 Tf"];
+    for (const line of safe) {
+      if (y < 50) break;
+      streamLines.push(`1 0 0 1 50 ${y} Tm (${line || " "}) Tj`);
+      y -= lineHeight;
+    }
+    streamLines.push("ET");
+    const stream = streamLines.join("\n");
+    const streamLen = stream.length;
+
+    const objects: string[] = [];
+    objects.push("1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj");
+    objects.push("2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj");
+    objects.push("3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj");
+    objects.push("4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj");
+    objects.push(`5 0 obj << /Length ${streamLen} >> stream\n${stream}\nendstream endobj`);
+
+    let pdf = "%PDF-1.4\n";
+    const offsets: number[] = [0];
+    for (const obj of objects) {
+      offsets.push(pdf.length);
+      pdf += `${obj}\n`;
+    }
+    const xrefPos = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n`;
+    pdf += "0000000000 65535 f \n";
+    for (let i = 1; i < offsets.length; i++) {
+      pdf += `${offsets[i].toString().padStart(10, "0")} 00000 n \n`;
+    }
+    pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`;
+    return new TextEncoder().encode(pdf);
+  };
+
+  const handleDownload = (format: "pdf" | "word" | "readme") => {
     setIsDownloading(true);
     setTimeout(() => {
       setIsDownloading(false);
+      const reportMd = buildReportMarkdown();
 
-      const content =
-        `# Architecture Analysis Report\n\n` +
-        `## Mode\n${last?.mode || "N/A"}\n\n` +
-        (last?.warning ? `## Warning\n${last.warning}\n\n` : "") +
-        `## Analysis Report\n${last?.analysis_report || "No analysis report found."}\n\n` +
-        `## Architecture Plan\n${last?.architecture_plan || "No architecture plan found."}\n`;
+      if (format === "readme") {
+        downloadBlob(reportMd, "text/markdown;charset=utf-8", "architecture-report.md");
+        return;
+      }
 
-      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "architecture-report.md";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      if (format === "word") {
+        const bodyHtml = reportMd
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\n/g, "<br/>");
+        const docHtml = `<html><head><meta charset="utf-8"></head><body><h1>Architecture Analysis Report</h1><div>${bodyHtml}</div></body></html>`;
+        downloadBlob(docHtml, "application/msword;charset=utf-8", "architecture-report.doc");
+        return;
+      }
+
+      const pdfBytes = toSimplePdfBytes(reportMd);
+      downloadBlob(pdfBytes, "application/pdf", "architecture-report.pdf");
     }, 400);
   };
 
@@ -121,25 +208,38 @@ export default function Reports() {
               </div>
 
               {/* Download Button */}
-              <Button 
+              <Button
                 variant="hero" 
                 size="lg" 
                 className="w-full"
-                onClick={handleDownload}
+                onClick={() => setShowDownloadOptions((v) => !v)}
                 disabled={isDownloading}
               >
                 {isDownloading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Generating PDF...
+                    Preparing report...
                   </>
                 ) : (
                   <>
                     <Download className="mr-2 h-5 w-5" />
-                    Download PDF Report
+                    Download Report
                   </>
                 )}
               </Button>
+              {showDownloadOptions && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <Button variant="outline" onClick={() => handleDownload("pdf")} disabled={isDownloading}>
+                    Download PDF
+                  </Button>
+                  <Button variant="outline" onClick={() => handleDownload("word")} disabled={isDownloading}>
+                    Download Word File
+                  </Button>
+                  <Button variant="outline" onClick={() => handleDownload("readme")} disabled={isDownloading}>
+                    Download readme file
+                  </Button>
+                </div>
+              )}
             </motion.div>
 
             {/* Report Preview Summary */}

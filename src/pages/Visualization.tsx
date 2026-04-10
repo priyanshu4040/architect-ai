@@ -20,27 +20,45 @@ import { loadLastResult } from "@/lib/api";
 interface ArchNode {
   id: string;
   name: string;
-  layer: string;
+  layer: "presentation" | "business" | "data" | "infrastructure";
   type: string;
+  functionality: string;
   risk?: "high" | "medium" | "low";
   connections: string[];
 }
 
-function graphToArchNodes(graph: { nodes: { id: string; label: string; type?: string | null }[]; edges: { source: string; target: string }[] }): ArchNode[] {
+function fallbackLayerFromType(t: string): ArchNode["layer"] {
+  const x = (t || "").toLowerCase();
+  if (["controller", "api", "gateway", "handler", "ui", "view", "page", "screen", "frontend"].includes(x)) {
+    return "presentation";
+  }
+  if (["repository", "database", "cache"].includes(x)) {
+    return "data";
+  }
+  if (["client", "queue", "storage", "external", "file"].includes(x)) {
+    return "infrastructure";
+  }
+  return "business";
+}
+
+function graphToArchNodes(graph: { nodes: { id: string; label: string; type?: string | null; layer?: string | null; functionality?: string | null; description?: string | null }[]; edges: { source: string; target: string }[] }): ArchNode[] {
   const byId = new Map<string, ArchNode>();
   for (const n of graph.nodes || []) {
-    // Best-effort layer/type mapping from backend graph
-    const t = (n.type || "component").toString();
-    const layer =
-      t.includes("file") ? "presentation" :
-      t.includes("class") ? "business" :
-      t.includes("external") ? "infrastructure" :
-      "business";
+    const t = (n.type || "component").toString().toLowerCase();
+    const backendLayer = (n.layer || "").toString().toLowerCase();
+    const layer: ArchNode["layer"] =
+      backendLayer === "presentation" ||
+      backendLayer === "business" ||
+      backendLayer === "data" ||
+      backendLayer === "infrastructure"
+        ? (backendLayer as ArchNode["layer"])
+        : fallbackLayerFromType(t);
     byId.set(n.id, {
       id: n.id,
       name: n.label || n.id,
       layer,
-      type: t,
+      type: t || "component",
+      functionality: (n.functionality || n.description || "No functionality details provided by the agent.").toString(),
       connections: [],
     });
   }
@@ -53,24 +71,24 @@ function graphToArchNodes(graph: { nodes: { id: string; label: string; type?: st
 
 const mockArchitecture: ArchNode[] = [
   // Presentation Layer
-  { id: "p1", name: "React UI", layer: "presentation", type: "frontend", connections: ["b1", "b2"] },
-  { id: "p2", name: "API Gateway", layer: "presentation", type: "gateway", connections: ["b1", "b2", "b3"] },
-  { id: "p3", name: "Auth Service", layer: "presentation", type: "auth", connections: ["b2", "d1"] },
+  { id: "p1", name: "React UI", layer: "presentation", type: "frontend", functionality: "Renders user-facing screens and sends user actions to backend APIs.", connections: ["b1", "b2"] },
+  { id: "p2", name: "API Gateway", layer: "presentation", type: "gateway", functionality: "Acts as a single entry point for API requests, routing to internal services.", connections: ["b1", "b2", "b3"] },
+  { id: "p3", name: "Auth Service", layer: "presentation", type: "auth", functionality: "Handles authentication flows such as login, token validation, and session checks.", connections: ["b2", "d1"] },
   
   // Business Logic
-  { id: "b1", name: "Order Service", layer: "business", type: "service", risk: "high", connections: ["d1", "d2"] },
-  { id: "b2", name: "User Service", layer: "business", type: "service", connections: ["d1"] },
-  { id: "b3", name: "Notification", layer: "business", type: "service", connections: ["i1"] },
-  { id: "b4", name: "Analytics", layer: "business", type: "service", risk: "medium", connections: ["d2", "d3"] },
+  { id: "b1", name: "Order Service", layer: "business", type: "service", functionality: "Executes order lifecycle logic such as creation, validation, and fulfillment workflow.", risk: "high", connections: ["d1", "d2"] },
+  { id: "b2", name: "User Service", layer: "business", type: "service", functionality: "Manages user profiles, preferences, and account-related business rules.", connections: ["d1"] },
+  { id: "b3", name: "Notification", layer: "business", type: "service", functionality: "Coordinates notification events and dispatches messages through messaging infrastructure.", connections: ["i1"] },
+  { id: "b4", name: "Analytics", layer: "business", type: "service", functionality: "Computes product and usage insights from transactional and cached data.", risk: "medium", connections: ["d2", "d3"] },
   
   // Data Layer
-  { id: "d1", name: "User DB", layer: "data", type: "database", connections: [] },
-  { id: "d2", name: "Order DB", layer: "data", type: "database", risk: "high", connections: [] },
-  { id: "d3", name: "Redis Cache", layer: "data", type: "cache", connections: [] },
+  { id: "d1", name: "User DB", layer: "data", type: "database", functionality: "Persists user entities and supports account-level read/write operations.", connections: [] },
+  { id: "d2", name: "Order DB", layer: "data", type: "database", functionality: "Stores order records and guarantees consistency for order transactions.", risk: "high", connections: [] },
+  { id: "d3", name: "Redis Cache", layer: "data", type: "cache", functionality: "Caches frequently accessed data to reduce read latency and DB load.", connections: [] },
   
   // Infrastructure
-  { id: "i1", name: "Message Queue", layer: "infrastructure", type: "queue", connections: [] },
-  { id: "i2", name: "File Storage", layer: "infrastructure", type: "storage", connections: [] },
+  { id: "i1", name: "Message Queue", layer: "infrastructure", type: "queue", functionality: "Provides asynchronous message delivery between loosely coupled components.", connections: [] },
+  { id: "i2", name: "File Storage", layer: "infrastructure", type: "storage", functionality: "Stores and retrieves binary assets such as documents and media files.", connections: [] },
 ];
 
 const layers = [
@@ -241,6 +259,10 @@ export default function Visualization() {
                       <div>
                         <p className="text-sm text-muted-foreground">Type</p>
                         <p className="text-foreground capitalize">{selectedNode.type}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Functionality</p>
+                        <p className="text-foreground">{selectedNode.functionality}</p>
                       </div>
                       {selectedNode.risk && (
                         <div>

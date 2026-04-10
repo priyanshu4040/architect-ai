@@ -4,6 +4,8 @@ export interface GraphNode {
   id: string;
   label: string;
   type?: string | null;
+  layer?: "presentation" | "business" | "data" | "infrastructure" | null;
+  functionality?: string | null;
   description?: string | null;
   group?: number | null;
 }
@@ -27,7 +29,55 @@ export interface AnalyzeResponse {
   graph: GraphPayload;
   memory_used: string;
   warning: string;
+  results?: AnalyzeResults | null;
 }
+
+export type AnalyzeResults = {
+  component_details?: {
+    component: string;
+    functionality: string;
+    inputs?: string[] | null;
+    outputs?: string[] | null;
+    dependencies?: string[] | null;
+  }[];
+  component_layer_mapping?: {
+    component: string;
+    layer: "presentation" | "business" | "data" | "infrastructure" | string;
+    reason?: string;
+    confidence?: number;
+  }[];
+  recommended_patterns?: {
+    pattern: string;
+    why: string;
+    confidence: number;
+    tags?: string[] | null;
+  }[];
+  key_decisions?: {
+    decision: string;
+    rationale: string;
+    alternatives?: string[] | null;
+  }[];
+  risk_analysis?: {
+    risk: string;
+    severity: "high" | "medium" | "low" | string;
+    impact: string;
+    likelihood: "high" | "medium" | "low" | string;
+    mitigation: string;
+  }[];
+  evolution_roadmap?: {
+    phase: string;
+    timeframe: string;
+    goals?: string[] | null;
+    deliverables?: string[] | null;
+  }[];
+  indicators?: {
+    scalability: number;
+    performance: number;
+    maintainability: number;
+    security: number;
+    notes?: Partial<Record<"scalability" | "performance" | "maintainability" | "security", string>>;
+  };
+};
 
 export interface AnalyzeRequest {
   mode: AnalyzeMode;
@@ -133,6 +183,24 @@ export async function analyze(req: AnalyzeRequest): Promise<AnalyzeResponse> {
     }
     throw err;
   }
+}
+
+export async function analyzeBrownfieldZip(file: File): Promise<AnalyzeResponse> {
+  const fd = new FormData();
+  fd.append("file", file, file.name);
+
+  const res = await fetch(`${API_BASE}/api/brownfield/zip`, {
+    method: "POST",
+    body: fd,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw Object.assign(new Error(text || `Request failed: ${res.status}`), {
+      status: res.status,
+      body: text,
+    });
+  }
+  return (await res.json()) as AnalyzeResponse;
 }
 
 const LAST_RESULT_KEY = "architect_ai:last_result";

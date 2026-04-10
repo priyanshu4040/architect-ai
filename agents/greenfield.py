@@ -30,33 +30,110 @@ def architecture_agent(state: AgentState) -> AgentState:
     """
     if state["mode"] == "greenfield":
         print("\n[Architecture Agent] Designing from scratch (Greenfield)...")
-        context = f"Requirements:\n{state['input']}"
+        # In orchestrated mode, `analysis_report` is produced first by `analysis_agent`.
+        analysis = (state.get("analysis_report") or "").strip()
+        if analysis:
+            context = f"Requirements:\n{state['input']}\n\nAnalysis Report:\n{analysis}"
+        else:
+            context = f"Requirements:\n{state['input']}"
     else:
         print("\n[Architecture Agent] Designing refactored architecture (Brownfield)...")
         context = f"Existing Codebase Analysis Report:\n{state['analysis_report']}\n\nExisting AST Structure:\n{state.get('ast_summary', '')}"
 
-    prompt = f"""
-You are an expert software architect.
+    past_memory = state.get("past_memory", "No past memory found.")
 
-Based on the following context, build or refactor the architecture.
-
-{context}
-
---- PAST ARCHITECTURAL KNOWLEDGE (RAG Memory) ---
-{state.get('past_memory', 'No past memory found.')}
--------------------------------------------------
-
-Do the following:
-1. Suggest best architecture (Microservices, MVC, Layered, Event-Driven, etc.). Align with PAST ARCHITECTURAL KNOWLEDGE if relevant.
-2. Provide a HIGHLY DETAILED modular decomposition grouped strictly by Topic/Business Domain.
-3. For each Topic/Module, explicitly list the exact Class Names to be built.
-4. Detail exactly how those classes Connect to each other and their relation to one another (Inheritance, Composition, or API calls).
-5. Suggest design patterns (Factory, Observer, Strategy, etc.) to use for those class relations.
-6. Generate a visual Dependency Graph using Mermaid.js (` ```mermaid graph TD ... ``` `) that plots all the classes and their exact connections to each other.
-
-Keep answer structured, extremely detailed, and concise.
-"""
+    prompt = (
+        "You are an expert software architect.\n\n"
+        "Based on the following context, build or refactor the architecture.\n\n"
+        f"{context}\n\n"
+        "--- PAST ARCHITECTURAL KNOWLEDGE (RAG Memory) ---\n"
+        f"{past_memory}\n"
+        "-------------------------------------------------\n\n"
+        "Do the following:\n"
+        "1. Provide a highly detailed modular decomposition grouped by Topic/Business Domain.\n"
+        "2. For each Topic/Module, list the exact class/component names to be built.\n"
+        "3. Describe how components connect (API calls, composition, events, inheritance).\n"
+        "4. Suggest key design patterns for those relationships.\n"
+        "5. Generate a Mermaid dependency graph using a fenced block: ```mermaid\\ngraph TD\\n...\\n```\n\n"
+        "Then, at the very end, output a STRICT JSON block in this exact format (no trailing commas, no comments, no additional keys outside \"results\"):\n\n"
+        "```json\n"
+        "{\n"
+        "  \"results\": {\n"
+        "    \"component_details\": [\n"
+        "      {\n"
+        "        \"component\": \"string\",\n"
+        "        \"functionality\": \"2-4 sentence detailed responsibility and behavior\",\n"
+        "        \"inputs\": [\"string\"],\n"
+        "        \"outputs\": [\"string\"],\n"
+        "        \"dependencies\": [\"string\"]\n"
+        "      }\n"
+        "    ],\n"
+        "    \"component_layer_mapping\": [\n"
+        "      {\n"
+        "        \"component\": \"string\",\n"
+        "        \"layer\": \"presentation|business|data|infrastructure\",\n"
+        "        \"reason\": \"string\",\n"
+        "        \"confidence\": 0\n"
+        "      }\n"
+        "    ],\n"
+        "    \"recommended_patterns\": [\n"
+        "      {\n"
+        "        \"pattern\": \"string\",\n"
+        "        \"why\": \"string\",\n"
+        "        \"confidence\": 0,\n"
+        "        \"tags\": [\"string\"]\n"
+        "      }\n"
+        "    ],\n"
+        "    \"key_decisions\": [\n"
+        "      {\n"
+        "        \"decision\": \"string\",\n"
+        "        \"rationale\": \"string\",\n"
+        "        \"alternatives\": [\"string\"]\n"
+        "      }\n"
+        "    ],\n"
+        "    \"risk_analysis\": [\n"
+        "      {\n"
+        "        \"risk\": \"string\",\n"
+        "        \"severity\": \"high|medium|low\",\n"
+        "        \"impact\": \"string\",\n"
+        "        \"likelihood\": \"high|medium|low\",\n"
+        "        \"mitigation\": \"string\"\n"
+        "      }\n"
+        "    ],\n"
+        "    \"evolution_roadmap\": [\n"
+        "      {\n"
+        "        \"phase\": \"string\",\n"
+        "        \"timeframe\": \"string\",\n"
+        "        \"goals\": [\"string\"],\n"
+        "        \"deliverables\": [\"string\"]\n"
+        "      }\n"
+        "    ],\n"
+        "    \"indicators\": {\n"
+        "      \"scalability\": 0,\n"
+        "      \"performance\": 0,\n"
+        "      \"maintainability\": 0,\n"
+        "      \"security\": 0,\n"
+        "      \"notes\": {\n"
+        "        \"scalability\": \"string\",\n"
+        "        \"performance\": \"string\",\n"
+        "        \"maintainability\": \"string\",\n"
+        "        \"security\": \"string\"\n"
+        "      }\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "```\n\n"
+        "Rules for JSON:\n"
+        "- Use integers 0-100 for indicators and confidence.\n"
+        "- component_details must include every major component from the decomposition and Mermaid graph.\n"
+        "- functionality must be concrete and specific (avoid generic labels like 'handles logic').\n"
+        "- component_layer_mapping must include every major component from the decomposition and Mermaid graph.\n"
+        "- layer must be one of: presentation, business, data, infrastructure.\n"
+        "- Provide 3-5 items per list where possible.\n"
+        "- Keep strings concise and professional.\n\n"
+        "Keep the rest of the answer structured, detailed, and concise.\n"
+    )
 
     response = llm.invoke(prompt)
     print("\n[Architecture Agent] Plan generated.")
-    return {"architecture_plan": response.content}
+    return {"architecture_plan": (response.content or "").strip()}

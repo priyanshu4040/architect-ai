@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { analyze, saveLastResult } from "@/lib/api";
+import { analyze, analyzeBrownfieldZip, saveLastResult } from "@/lib/api";
 import { toast } from "sonner";
 
 type ProjectMode = "greenfield" | "brownfield";
@@ -37,7 +37,7 @@ interface WizardState {
   security: number;
   expectedUsers: string;
   growthRate: string;
-  repositoryUrl: string;
+  brownfieldZip: File | null;
 }
 
 const domains = [
@@ -70,7 +70,7 @@ export default function ProjectSetup() {
     security: 50,
     expectedUsers: "",
     growthRate: "",
-    repositoryUrl: "",
+    brownfieldZip: null,
   });
 
   const updateState = (updates: Partial<WizardState>) => {
@@ -82,7 +82,7 @@ export default function ProjectSetup() {
       case 1: return state.projectName.trim().length > 0;
       case 2: return state.mode && state.domain;
       case 3: return state.mode === "brownfield" 
-        ? state.repositoryUrl.trim().length > 0 
+        ? !!state.brownfieldZip
         : state.functionalRequirements.trim().length > 0;
       case 4: return true;
       default: return false;
@@ -93,12 +93,24 @@ export default function ProjectSetup() {
     const mode = state.mode;
     if (!mode) return;
 
-    const input =
-      mode === "greenfield"
-        ? state.functionalRequirements
-        : state.repositoryUrl;
+    if (mode === "brownfield") {
+      if (!state.brownfieldZip) {
+        toast.error("Please upload a .zip file.");
+        return;
+      }
+      analyzeBrownfieldZip(state.brownfieldZip)
+        .then((result) => {
+          saveLastResult(result);
+          navigate("/dashboard");
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : "Analysis failed";
+          toast.error(message);
+        });
+      return;
+    }
 
-    analyze({ mode, input })
+    analyze({ mode, input: state.functionalRequirements })
       .then((result) => {
         saveLastResult(result);
         navigate("/dashboard");
@@ -342,16 +354,19 @@ function StepRequirements({ state, updateState }: { state: WizardState; updateSt
       {state.mode === "brownfield" ? (
         <div className="space-y-6">
           <div>
-            <Label htmlFor="repoUrl">Repository URL</Label>
+            <Label htmlFor="zipUpload">Upload Codebase (.zip)</Label>
             <Input
-              id="repoUrl"
-              placeholder="https://github.com/username/repo"
-              value={state.repositoryUrl}
-              onChange={(e) => updateState({ repositoryUrl: e.target.value })}
+              id="zipUpload"
+              type="file"
+              accept=".zip,application/zip"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                updateState({ brownfieldZip: f });
+              }}
               className="mt-2"
             />
             <p className="text-xs text-muted-foreground mt-2">
-              Provide a link to your GitHub, GitLab, or Bitbucket repository
+              Upload a zipped copy of your codebase (GitHub “Download ZIP” also works)
             </p>
           </div>
           <div className="p-4 rounded-lg bg-secondary/30 border border-border/50">
@@ -460,8 +475,8 @@ function StepReview({ state }: { state: WizardState }) {
 
         {state.mode === "brownfield" ? (
           <div className="p-4 rounded-lg bg-secondary/30 border border-border/50">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Repository</h3>
-            <p className="text-foreground break-all">{state.repositoryUrl}</p>
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Codebase ZIP</h3>
+            <p className="text-foreground break-all">{state.brownfieldZip?.name || "No file selected"}</p>
           </div>
         ) : (
           <>
