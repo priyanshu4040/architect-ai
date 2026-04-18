@@ -25,9 +25,9 @@ def _split_origins(raw: str) -> List[str]:
 
 
 def _load_env() -> None:
-    # Load from repo root so running `uvicorn backend.app.main:app` works.
+    # `main.py` is at architect-ai/backend/app/ — repo root is architect-ai/
     this_dir = os.path.dirname(__file__)
-    repo_root = os.path.abspath(os.path.join(this_dir, "..", "..", ".."))
+    repo_root = os.path.abspath(os.path.join(this_dir, "..", ".."))
     load_dotenv(os.path.join(repo_root, ".env"), override=False)
 
 
@@ -43,8 +43,10 @@ app = FastAPI(
 allowed_origins = _split_origins(
     os.getenv(
         "CORS_ORIGINS",
-        # Common dev ports (Vite=5173, CRA=3000, some setups=8080)
-        "http://localhost:3000,http://localhost:5173,http://localhost:8080",
+        # Common dev ports; include 127.0.0.1 — browsers treat it as a distinct origin from localhost.
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:8080,http://127.0.0.1:8080",
     )
 )
 app.add_middleware(
@@ -64,7 +66,17 @@ def health_check():
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 def analyze(payload: AnalyzeRequest):
     try:
-        result = run_analysis(payload.mode, payload.input)
+        result = run_analysis(
+            payload.mode,
+            payload.input,
+            project_name=payload.project_name,
+            scalability=payload.scalability,
+            performance=payload.performance,
+            maintainability=payload.maintainability,
+            security=payload.security,
+            expected_users=payload.expected_users,
+            growth_rate=payload.growth_rate,
+        )
         return AnalyzeResponse(**result)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -81,7 +93,17 @@ def analyze_alias(payload: AnalyzeRequest):
 @app.post("/api/greenfield", response_model=AnalyzeResponse)
 def greenfield(payload: GreenfieldRequest):
     try:
-        result = run_analysis("greenfield", payload.requirements)
+        result = run_analysis(
+            "greenfield",
+            payload.requirements,
+            project_name=payload.project_name,
+            scalability=payload.scalability,
+            performance=payload.performance,
+            maintainability=payload.maintainability,
+            security=payload.security,
+            expected_users=payload.expected_users,
+            growth_rate=payload.growth_rate,
+        )
         return AnalyzeResponse(**result)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Greenfield failed: {exc}") from exc

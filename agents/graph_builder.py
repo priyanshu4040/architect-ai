@@ -38,7 +38,34 @@ def _classify_component(label: str) -> tuple[str, int, str]:
         return ("controller", 1, "Presentation/API surface")
 
     # Data layer
-    if any(k in l for k in ("repository", " repo", "repo", "dao", "db", "database", "model", "orm", "query", "cache", "redis")):
+    if any(
+        k in l
+        for k in (
+            "repository",
+            " repo",
+            "repo",
+            "dao",
+            "dal",
+            "db",
+            "database",
+            "postgres",
+            "mysql",
+            "mongo",
+            "sql",
+            "jdbc",
+            "persist",
+            "persistence",
+            "entity",
+            "prisma",
+            "jpa",
+            "hibernate",
+            "model",
+            "orm",
+            "query",
+            "cache",
+            "redis",
+        )
+    ):
         # keep more specific types when possible
         if "cache" in l or "redis" in l:
             return ("cache", 3, "Cache/data access")
@@ -76,7 +103,7 @@ def parse_mermaid_to_graph(text: str) -> dict:
     edges = []
 
     # Extract mermaid block
-    mermaid_match = re.search(r"```mermaid(.*?)```", text, re.DOTALL | re.IGNORECASE)
+    mermaid_match = re.search(r"```mermaid\s*([\s\S]*?)```", text, re.IGNORECASE)
     if not mermaid_match:
         return {"nodes": [], "edges": [], "error": "No Mermaid diagram found in architecture plan."}
 
@@ -105,17 +132,27 @@ def parse_mermaid_to_graph(text: str) -> dict:
             nodes[node_id]["description"] = desc
             nodes[node_id]["group"] = group
 
+    node_paren_re = re.compile(r"(\w+)\(([^)]*)\)")
+
     for line in mermaid_code.splitlines():
         line = line.strip()
-        if not line or line.lower().startswith(("graph", "subgraph", "end", "%%")):
+        low = line.lower()
+        if not line or low.startswith(("graph", "flowchart", "subgraph", "end", "%%", "direction")):
             continue
 
         # Collect node label hints from this line BEFORE stripping
         for nid, nlabel in node_label_re.findall(line):
             get_or_create(nid, nlabel)
+        for nid, nlabel in node_paren_re.findall(line):
+            if "-->" in nlabel or "==>" in nlabel:
+                continue
+            get_or_create(nid, nlabel.strip())
 
         # Strip ALL bracket groups so A["My Class"] --> B["Base"] becomes A --> B
-        clean = re.sub(r'\[.*?\]', '', line)  # remove [...]
+        clean = re.sub(r"\[\[.*?\]\]", "", line)  # mermaid [[rounded]]
+        clean = re.sub(r"\(\([^)]*\)\)", "", clean)  # ((stadium))
+        clean = re.sub(r"\([^)]*\)", "", clean)  # (round)
+        clean = re.sub(r'\[.*?\]', '', clean)  # remove [...]
         # Also strip trailing > that some LLMs emit after |label|>
         clean = clean.replace("|>", "|").replace("->|", "--|")
 
@@ -240,17 +277,27 @@ def parse_ast_summary_to_graph(ast_summary: str) -> dict:
             short = current_file.replace("\\", "/").split("/")[-1]
             add_node(file_id, short, "file", 1)
 
-        # Classes line
-        elif line.startswith("Classes:") and current_file:
+        # Classes line (ast_parser emits "Classes/Interfaces:")
+        elif current_file and (
+            line.startswith("Classes/Interfaces:")
+            or line.startswith("Classes:")
+        ):
             file_id = f"file::{current_file}"
-            class_entries = line.replace("Classes:", "").strip().split(",")
+            if line.startswith("Classes/Interfaces:"):
+                class_entries = line.split("Classes/Interfaces:", 1)[1].strip().split(",")
+            else:
+                class_entries = line.replace("Classes:", "").strip().split(",")
             for entry in class_entries:
                 entry = entry.strip()
                 if not entry:
                     continue
 
-                # Detect inheritance: `SubClass (Inherits: Base1, Base2)`
+                # Detect inheritance: Python `SubClass (Inherits: Base)` or JS/TS `(extends: Base)`
                 inherit_match = re.match(r'(\w+)\s*\(Inherits:\s*([^)]+)\)', entry)
+                if not inherit_match:
+                    inherit_match = re.match(
+                        r'(\w+)\s*\(extends:\s*([^)]+)\)', entry, re.IGNORECASE
+                    )
                 if inherit_match:
                     cls_name  = inherit_match.group(1).strip()
                     bases     = [b.strip() for b in inherit_match.group(2).split(",")]

@@ -10,6 +10,8 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { loadLastResult } from "@/lib/api";
+import { buildReportWordDocumentHtml, markdownToPdfBlob } from "@/lib/reportExport";
+import { toast } from "sonner";
 
 const reportSections = [
   { title: "Executive Summary", pages: 2, included: true },
@@ -30,9 +32,7 @@ export default function Reports() {
   const sanitizeReportContent = (raw: string): string => {
     if (!raw) return "";
     return raw
-      // Remove Mermaid graph blocks
-      .replace(/```mermaid[\s\S]*?```/gi, "")
-      // Remove JSON output blocks
+      // Remove JSON output blocks (Mermaid is kept — section 10 of the export)
       .replace(/```json[\s\S]*?```/gi, "")
       // Remove excessive blank lines introduced after stripping blocks
       .replace(/\n{3,}/g, "\n\n")
@@ -67,57 +67,9 @@ export default function Reports() {
     URL.revokeObjectURL(url);
   };
 
-  const toSimplePdfBytes = (text: string): Uint8Array<ArrayBuffer> => {
-    const safe = text
-      .replace(/\r/g, "")
-      .split("\n")
-      .map((line) =>
-        line
-          .replace(/\\/g, "\\\\")
-          .replace(/\(/g, "\\(")
-          .replace(/\)/g, "\\)")
-          .slice(0, 110)
-      );
-
-    let y = 800;
-    const lineHeight = 14;
-    const streamLines = ["BT", "/F1 10 Tf"];
-    for (const line of safe) {
-      if (y < 50) break;
-      streamLines.push(`1 0 0 1 50 ${y} Tm (${line || " "}) Tj`);
-      y -= lineHeight;
-    }
-    streamLines.push("ET");
-    const stream = streamLines.join("\n");
-    const streamLen = stream.length;
-
-    const objects: string[] = [];
-    objects.push("1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj");
-    objects.push("2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj");
-    objects.push("3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj");
-    objects.push("4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj");
-    objects.push(`5 0 obj << /Length ${streamLen} >> stream\n${stream}\nendstream endobj`);
-
-    let pdf = "%PDF-1.4\n";
-    const offsets: number[] = [0];
-    for (const obj of objects) {
-      offsets.push(pdf.length);
-      pdf += `${obj}\n`;
-    }
-    const xrefPos = pdf.length;
-    pdf += `xref\n0 ${objects.length + 1}\n`;
-    pdf += "0000000000 65535 f \n";
-    for (let i = 1; i < offsets.length; i++) {
-      pdf += `${offsets[i].toString().padStart(10, "0")} 00000 n \n`;
-    }
-    pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`;
-    return new TextEncoder().encode(pdf);
-  };
-
-  const handleDownload = (format: "pdf" | "word" | "readme") => {
+  const handleDownload = async (format: "pdf" | "word" | "readme") => {
     setIsDownloading(true);
-    setTimeout(() => {
-      setIsDownloading(false);
+    try {
       const reportMd = buildReportMarkdown();
 
       if (format === "readme") {
@@ -126,19 +78,20 @@ export default function Reports() {
       }
 
       if (format === "word") {
-        const bodyHtml = reportMd
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/\n/g, "<br/>");
-        const docHtml = `<html><head><meta charset="utf-8"></head><body><h1>Architecture Analysis Report</h1><div>${bodyHtml}</div></body></html>`;
-        downloadBlob(docHtml, "application/msword;charset=utf-8", "architecture-report.doc");
+        const docHtml = buildReportWordDocumentHtml("Architecture Analysis Report", reportMd);
+        const bom = "\uFEFF";
+        downloadBlob(bom + docHtml, "application/msword;charset=utf-8", "architecture-report.doc");
         return;
       }
 
-      const pdfBytes = toSimplePdfBytes(reportMd);
-      downloadBlob(pdfBytes as unknown as BlobPart, "application/pdf", "architecture-report.pdf");
-    }, 400);
+      const pdfBlob = await markdownToPdfBlob(reportMd);
+      downloadBlob(pdfBlob, "application/pdf", "architecture-report.pdf");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Export failed";
+      toast.error(msg);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const totalPages = reportSections.reduce((acc, section) => acc + section.pages, 0);

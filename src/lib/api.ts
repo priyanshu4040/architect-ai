@@ -101,6 +101,13 @@ export type AnalyzeResults = {
 export interface AnalyzeRequest {
   mode: AnalyzeMode;
   input: string;
+  project_name?: string | null;
+  scalability?: number | null;
+  performance?: number | null;
+  maintainability?: number | null;
+  security?: number | null;
+  expected_users?: string | null;
+  growth_rate?: string | null;
 }
 
 const API_BASE =

@@ -110,7 +110,17 @@ export default function ProjectSetup() {
       return;
     }
 
-    analyze({ mode, input: state.functionalRequirements })
+    analyze({
+      mode,
+      input: state.functionalRequirements,
+      project_name: state.projectName.trim() || undefined,
+      scalability: state.scalability,
+      performance: state.performance,
+      maintainability: state.maintainability,
+      security: state.security,
+      expected_users: state.expectedUsers.trim() || undefined,
+      growth_rate: state.growthRate.trim() || undefined,
+    })
       .then((result) => {
         saveLastResult(result);
         navigate("/dashboard");

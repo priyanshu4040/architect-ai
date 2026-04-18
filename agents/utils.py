@@ -4,6 +4,14 @@ Utility functions for the system.
 
 import os
 
+# Shared LLM grounding: reduces generic/hallucinated component names.
+PROMPT_GROUNDING = (
+    "IMPORTANT: Only suggest components that are DIRECTLY related to the following project.\n"
+    "Do NOT invent unrelated generic names (for example random UserService, DatabaseManager, "
+    "ControllerBase, or AdapterX) unless the requirements, AST summary, or README clearly imply them.\n"
+    "All component names must be traceable to the requirements, structural summary, or README below.\n"
+)
+
 def read_codebase(path: str) -> str:
     """Reads a file or a whole directory of code files into a single string."""
     if not os.path.exists(path):

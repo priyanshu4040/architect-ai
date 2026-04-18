@@ -5,10 +5,24 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
+# Load .env from the repo root early so GROQ_API_KEY is available whenever
+# this module is imported (e.g. standalone scripts, tests, or direct uvicorn
+# invocations that don't go through backend/app/main.py first).
+try:
+    from dotenv import load_dotenv as _load_dotenv
+
+    _env_path = Path(__file__).resolve().parents[2] / ".env"
+    _load_dotenv(_env_path, override=False)
+except Exception:
+    pass  # python-dotenv not installed — rely on shell environment
+
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+from .layer_reconcile import reconcile_structured_layers
+from .layers_common import normalize_layer
 
 
 def _fallback_greenfield_plan(requirements: str) -> str:
@@ -103,6 +117,143 @@ def _extract_results_json(text: str) -> Dict[str, Any] | None:
     if isinstance(obj, dict) and isinstance(obj.get("results"), dict):
         return obj["results"]
     return None
+
+
+# Tokens that alone do not tie a component name to a specific project (whitelist overlap).
+_GENERIC_ARCH_TOKENS = frozenset(
+    {
+        "service",
+        "manager",
+        "controller",
+        "adapter",
+        "handler",
+        "client",
+        "base",
+        "helper",
+        "util",
+        "utils",
+        "data",
+        "model",
+        "dto",
+        "api",
+        "gateway",
+        "worker",
+        "provider",
+        "factory",
+        "impl",
+        "interface",
+        "component",
+        "module",
+        "system",
+        "app",
+        "core",
+        "common",
+        "shared",
+        "server",
+        "database",
+        "cache",
+        "queue",
+        "repo",
+        "repository",
+    }
+)
+
+
+def _tokenizer_words(text: str) -> set[str]:
+    return {m.group(0).lower() for m in re.finditer(r"[A-Za-z][A-Za-z0-9]{2,}", text or "")}
+
+
+def _name_fragments(name: str) -> set[str]:
+    raw = (name or "").strip()
+    if not raw:
+        return set()
+    s1 = re.sub(r"([a-z])([A-Z])", r"\1 \2", raw)
+    s2 = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", s1)
+    parts = {p.lower() for p in re.split(r"[\s_\-/]+", s2) if p}
+    alnum = re.sub(r"[^a-zA-Z0-9]", "", raw).lower()
+    if alnum:
+        parts.add(alnum)
+    return parts
+
+
+def _component_detail_grounded(
+    name: str, functionality: str, corpus_lower: str, ast_words: set[str]
+) -> bool:
+    name = (name or "").strip()
+    if not name:
+        return False
+    nl = name.lower()
+    if nl in corpus_lower:
+        return True
+    frags = _name_fragments(name)
+    meaningful = {f for f in frags if len(f) >= 3 and f not in _GENERIC_ARCH_TOKENS}
+    if not meaningful:
+        return nl in corpus_lower
+    for f in meaningful:
+        if f in corpus_lower:
+            return True
+    if meaningful & ast_words:
+        return True
+    fn_low = (functionality or "").lower()
+    for f in meaningful:
+        if len(f) >= 4 and f in fn_low and f in corpus_lower:
+            return True
+    return False
+
+
+def _prune_ungrounded_component_details(
+    results: Dict[str, Any] | None,
+    *,
+    corpus: str,
+    ast_summary: str,
+) -> tuple[Dict[str, Any] | None, str]:
+    """
+    Drop component_details entries with no lexical overlap with README/AST/requirements.
+    Returns (possibly mutated results dict, extra warning text).
+    """
+    if not results or not isinstance(results, dict):
+        return results, ""
+    details = results.get("component_details")
+    if not isinstance(details, list) or not details:
+        return results, ""
+
+    corpus_lower = (corpus or "").lower()
+    ast_words = _tokenizer_words(ast_summary or "")
+
+    kept: list[dict] = []
+    kept_lower: set[str] = set()
+    for item in details:
+        if not isinstance(item, dict):
+            continue
+        comp = str(item.get("component") or "").strip()
+        if not comp:
+            continue
+        fn = str(item.get("functionality") or "").strip()
+        if _component_detail_grounded(comp, fn, corpus_lower, ast_words):
+            kept.append(item)
+            kept_lower.add(comp.lower())
+
+    if not kept and details:
+        return results, ""
+
+    out = dict(results)
+    out["component_details"] = kept
+
+    mapping = out.get("component_layer_mapping")
+    if isinstance(mapping, list):
+        out["component_layer_mapping"] = [
+            m
+            for m in mapping
+            if isinstance(m, dict)
+            and str(m.get("component") or "").strip().lower() in kept_lower
+        ]
+    extra = ""
+    if len(kept) < len(details):
+        extra = (
+            f"Removed {len(details) - len(kept)} component(s) with no textual overlap "
+            "with README, AST summary, or requirements."
+        )
+    return out, extra
 
 
 def _results_to_analysis_report(results: Dict[str, Any]) -> str:
@@ -201,30 +352,6 @@ def _results_to_analysis_report(results: Dict[str, Any]) -> str:
     return "\n".join(lines).strip()
 
 
-def _normalize_layer(value: Any) -> str | None:
-    v = str(value or "").strip().lower()
-    if not v:
-        return None
-    aliases = {
-        "presentation": "presentation",
-        "ui": "presentation",
-        "api": "presentation",
-        "business": "business",
-        "business_logic": "business",
-        "logic": "business",
-        "domain": "business",
-        "service": "business",
-        "data": "data",
-        "data_access": "data",
-        "repository": "data",
-        "persistence": "data",
-        "infrastructure": "infrastructure",
-        "infra": "infrastructure",
-        "platform": "infrastructure",
-    }
-    return aliases.get(v)
-
-
 def _apply_layer_assignments(graph_data: Dict[str, Any], results: Dict[str, Any] | None) -> Dict[str, Any]:
     if not graph_data or not isinstance(graph_data, dict):
         return graph_data
@@ -240,7 +367,7 @@ def _apply_layer_assignments(graph_data: Dict[str, Any], results: Dict[str, Any]
         if not isinstance(item, dict):
             continue
         name = str(item.get("component") or "").strip().lower()
-        layer = _normalize_layer(item.get("layer"))
+        layer = normalize_layer(item.get("layer"))
         if name and layer:
             layer_by_component[name] = layer
 
@@ -310,7 +437,7 @@ def _apply_component_details(graph_data: Dict[str, Any], results: Dict[str, Any]
             for item in component_details:
                 if not isinstance(item, dict):
                     continue
-                name = str(item.get("component") or "").strip().lower()
+                name = str(item.get("component") or "").strip().lower().replace(" ", "").replace("_", "")
                 functionality = str(item.get("functionality") or "").strip()
                 inputs = [str(x).strip() for x in (item.get("inputs") or []) if str(x).strip()]
                 outputs = [str(x).strip() for x in (item.get("outputs") or []) if str(x).strip()]
@@ -332,20 +459,15 @@ def _apply_component_details(graph_data: Dict[str, Any], results: Dict[str, Any]
         if not isinstance(node, dict):
             continue
         label = str(node.get("label") or "").strip()
-        key_label = label.lower()
-        key_id = str(node.get("id") or "").strip().lower()
+        key_label = label.lower().replace(" ", "").replace("_", "")
+        key_id = str(node.get("id") or "").strip().lower().replace(" ", "").replace("_", "")
         chosen = details_by_component.get(key_label) or details_by_component.get(key_id)
         if not chosen:
             existing = str(node.get("functionality") or node.get("description") or "").strip()
             if existing and len(existing) >= 50:
                 chosen = existing
             else:
-                # In brownfield mode, avoid hardcoded generated templates and only
-                # surface agent/provided details when available.
-                if (mode or "").strip().lower() == "brownfield":
-                    chosen = "Functionality details were not generated by the agent for this component."
-                else:
-                    chosen = _detailed_functionality_fallback(label, node.get("layer"), node.get("type"))
+                chosen = _detailed_functionality_fallback(label, node.get("layer"), node.get("type"))
         node["functionality"] = chosen
         # Keep description aligned for clients that still read description.
         node["description"] = chosen
@@ -370,6 +492,19 @@ def _remove_mermaid_and_json_blocks(text: str) -> str:
     cleaned = re.sub(r"```json[\s\S]*?```", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
+
+
+def _extract_mermaid_block(text: str) -> str:
+    """Return a fenced Mermaid block from architecture plan text, or empty string."""
+    if not text:
+        return ""
+    m = re.search(r"```mermaid\s*([\s\S]*?)```", text, flags=re.IGNORECASE)
+    if not m:
+        return ""
+    inner = (m.group(1) or "").strip()
+    if not inner:
+        return ""
+    return f"```mermaid\n{inner}\n```"
 
 
 def _bar(score: int) -> str:
@@ -404,14 +539,25 @@ def _build_detailed_report_document(
     nodes = (graph_data or {}).get("nodes") or []
     edges = (graph_data or {}).get("edges") or []
 
-    # Build layer counts from graph payload
+    # Layer counts: prefer agent mapping (one row per component) so "Data" reflects JSON layers;
+    # fall back to graph node layers when mapping is missing.
     layer_counts: Dict[str, int] = {"presentation": 0, "business": 0, "data": 0, "infrastructure": 0}
-    for n in nodes:
-        if not isinstance(n, dict):
-            continue
-        layer = str(n.get("layer") or "").strip().lower()
-        if layer in layer_counts:
-            layer_counts[layer] += 1
+    mapping_counted = False
+    if isinstance(layer_map, list) and layer_map:
+        for item in layer_map:
+            if not isinstance(item, dict):
+                continue
+            layer = normalize_layer(item.get("layer"))
+            if layer in layer_counts:
+                layer_counts[layer] += 1
+                mapping_counted = True
+    if not mapping_counted:
+        for n in nodes:
+            if not isinstance(n, dict):
+                continue
+            layer = normalize_layer(n.get("layer")) or str(n.get("layer") or "").strip().lower()
+            if layer in layer_counts:
+                layer_counts[layer] += 1
 
     # Relationship counts by edge label
     rel_counts: Dict[str, int] = {}
@@ -517,8 +663,10 @@ def _build_detailed_report_document(
         for item in layer_map[:40]:
             if not isinstance(item, dict):
                 continue
+            raw_layer = item.get("layer", "N/A")
+            disp_layer = normalize_layer(raw_layer) or raw_layer
             lines.append(
-                f"| {item.get('component', 'N/A')} | {item.get('layer', 'N/A')} | "
+                f"| {item.get('component', 'N/A')} | {disp_layer} | "
                 f"{str(item.get('reason', 'N/A')).replace('|', '/')} | {int(item.get('confidence', 0) or 0)} |"
             )
     else:
@@ -616,9 +764,23 @@ def _build_detailed_report_document(
     lines.append("### 9.2 Architecture Narrative")
     lines.append(safe_plan or "No architecture narrative available.")
     lines.append("")
-    lines.append("## 10. Appendix")
-    lines.append("- Mermaid graph and raw JSON blocks are intentionally excluded from this report export.")
-    lines.append("- Use the in-app visualization tabs for interactive topology exploration.")
+    mermaid_block = _extract_mermaid_block(architecture_plan or "")
+    lines.append("## 10. Mermaid Dependency Graph")
+    if mermaid_block:
+        lines.append(
+            "The following diagram is copied from the architecture plan (same source as the in-app graph)."
+        )
+        lines.append("")
+        lines.append(mermaid_block)
+    else:
+        lines.append(
+            "_No fenced Mermaid block was found in the architecture plan. "
+            "Regenerate the analysis or ensure the plan includes a ```mermaid ...``` section._"
+        )
+    lines.append("")
+    lines.append("## 11. Appendix")
+    lines.append("- Raw ```json``` results blocks are omitted from narratives above; structured tables reflect that content.")
+    lines.append("- Use the in-app visualization tabs for interactive exploration and filtering.")
     return "\n".join(lines).strip()
 
 
@@ -656,10 +818,39 @@ def _ensure_brownfield_component_details(
     return base
 
 
-def run_analysis(mode: str, user_input: str) -> Dict[str, Any]:
+def run_analysis(
+    mode: str,
+    user_input: str,
+    *,
+    project_name: str | None = None,
+    scalability: int | None = None,
+    performance: int | None = None,
+    maintainability: int | None = None,
+    security: int | None = None,
+    expected_users: str | None = None,
+    growth_rate: str | None = None,
+) -> Dict[str, Any]:
     mode = mode.lower().strip()
     if mode not in {"greenfield", "brownfield"}:
         raise ValueError("mode must be 'greenfield' or 'brownfield'")
+
+    # Build a structured NFR context block to inject into agent prompts
+    nfr_lines: list[str] = []
+    if project_name:
+        nfr_lines.append(f"Project Name: {project_name}")
+    if scalability is not None:
+        nfr_lines.append(f"Scalability priority: {scalability}/100")
+    if performance is not None:
+        nfr_lines.append(f"Performance priority: {performance}/100")
+    if maintainability is not None:
+        nfr_lines.append(f"Maintainability priority: {maintainability}/100")
+    if security is not None:
+        nfr_lines.append(f"Security priority: {security}/100")
+    if expected_users:
+        nfr_lines.append(f"Expected users: {expected_users}")
+    if growth_rate:
+        nfr_lines.append(f"Monthly growth rate: {growth_rate}")
+    nfr_context = "\n".join(nfr_lines)  # empty string if no NFR data provided
 
     warning = ""
     ast_summary_text = ""
@@ -718,19 +909,36 @@ def run_analysis(mode: str, user_input: str) -> Dict[str, Any]:
             "ast_summary": ast_summary_text,
             "analysis_report": "",
             "architecture_plan": "",
+            "nfr_context": nfr_context,
         }
     )
 
     architecture_plan = result.get("architecture_plan", "") or ""
     analysis_report = result.get("analysis_report", "") or ""
-    structured_results = _extract_results_json(architecture_plan) or _extract_results_json(analysis_report)
+    structured_results = result.get("results") or {}
     if (not analysis_report.strip()) and structured_results:
         analysis_report = _results_to_analysis_report(structured_results)
+
+    _snippet_src = input_payload if mode == "brownfield" else user_input
+    _snippet = (_snippet_src or "").strip()
+    if len(_snippet) > 12000:
+        _snippet = _snippet[:12000]
+    validation_corpus = "\n".join(
+        [readme_text, ast_summary_text, nfr_context, _snippet]
+    )
+    if structured_results:
+        structured_results, prune_note = _prune_ungrounded_component_details(
+            structured_results,
+            corpus=validation_corpus,
+            ast_summary=ast_summary_text,
+        )
+        if prune_note:
+            warning = (warning + " | " if warning else "") + prune_note
+
     if architecture_plan:
-        # Prefer AST-derived graph in brownfield when we have it; otherwise, try to
-        # derive a usable graph from the architecture plan Mermaid/text so the
-        # frontend visualization never falls back to dummy data.
-        should_parse_plan = mode == "greenfield" or not (graph_data.get("nodes") or [])
+        # Always parse the LLM's refactored architecture graph instead of using the raw AST graph.
+        # This ensures the visual nodes exactly match the component_details the agent generates!
+        should_parse_plan = True
         if should_parse_plan:
             graph_data = mods["parse_mermaid_to_graph"](architecture_plan)
             if not (graph_data.get("nodes") or []):
@@ -751,6 +959,12 @@ def run_analysis(mode: str, user_input: str) -> Dict[str, Any]:
             readme_text=readme_text,
             past_memory=memory_used,
         )
+
+    if structured_results:
+        structured_results = reconcile_structured_layers(structured_results, graph_data)
+        lr_note = structured_results.pop("_layer_reconcile_note", None)
+        if isinstance(lr_note, str) and lr_note.strip():
+            warning = (warning + " | " if warning else "") + lr_note.strip()
 
     graph_data = _apply_layer_assignments(graph_data, structured_results)
     graph_data = _apply_component_details(graph_data, structured_results, mode=mode)

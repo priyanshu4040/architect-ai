@@ -3,24 +3,21 @@ Architecture Agent (Greenfield)
 Takes requirements for a NEW system and returns an architecture plan.
 """
 
-from langchain_community.chat_models import ChatOllama
 from agents.state import AgentState
-from pprint import pprint
+from agents.utils import PROMPT_GROUNDING
+from agents.schemas import ArchitectureOutput
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Instantly switch to Groq Cloud API if the key exists, otherwise use local Ollama
 groq_api_key = os.getenv("GROQ_API_KEY")
-if groq_api_key:
-    from langchain_groq import ChatGroq
-    llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_api_key)
-    print("[Greenfield] Using Groq Cloud API for Llama-3...")
-else:
-    from langchain_community.chat_models import ChatOllama
-    llm = ChatOllama(model="llama3")
-    print("[Greenfield] Using local Ollama for Llama-3...")
+if not groq_api_key:
+    raise ValueError("GROQ_API_KEY is not set in environment.")
+
+from langchain_groq import ChatGroq
+llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_api_key)
+print("[Greenfield] Using Groq Cloud API for Llama-3...")
 
 def architecture_agent(state: AgentState) -> AgentState:
     """
@@ -29,54 +26,35 @@ def architecture_agent(state: AgentState) -> AgentState:
     and returns a system architecture plan.
     """
     mode = state["mode"]
+    nfr = (state.get("nfr_context") or "").strip()
+    nfr_block = (
+        f"\n--- Non-functional priorities (user-specified) ---\n{nfr}\n"
+        if nfr
+        else ""
+    )
     if mode == "greenfield":
         print("\n[Architecture Agent] Designing from scratch (Greenfield)...")
-        # In orchestrated mode, `analysis_report` is produced first by `analysis_agent`.
         analysis = (state.get("analysis_report") or "").strip()
         if analysis:
-            context = f"Requirements:\n{state['input']}\n\nAnalysis Report:\n{analysis}"
+            context = (
+                f"Requirements:\n{state['input']}\n{nfr_block}\nAnalysis Report:\n{analysis}"
+            )
         else:
-            context = f"Requirements:\n{state['input']}"
+            context = f"Requirements:\n{state['input']}{nfr_block}"
     else:
         print("\n[Architecture Agent] Designing refactored architecture (Brownfield)...")
-        context = f"Existing Codebase Analysis Report:\n{state['analysis_report']}\n\nExisting AST Structure:\n{state.get('ast_summary', '')}"
+        ast = (state.get("ast_summary") or "").strip()
+        context = (
+            f"Existing Codebase Analysis Report:\n{state.get('analysis_report', '')}\n\n"
+            f"Existing AST Structure:\n{ast}\n"
+            f"{nfr_block}"
+        )
 
     past_memory = state.get("past_memory", "No past memory found.")
 
-    brownfield_extra_keys = (
-        "    \"current_codebase_faults\": [\n"
-        "      {\n"
-        "        \"fault\": \"string\",\n"
-        "        \"severity\": \"high|medium|low\",\n"
-        "        \"evidence\": \"string\",\n"
-        "        \"impact\": \"string\"\n"
-        "      }\n"
-        "    ],\n"
-        "    \"comparison_old_vs_new\": [\n"
-        "      {\n"
-        "        \"dimension\": \"string\",\n"
-        "        \"current_state\": \"string\",\n"
-        "        \"proposed_state\": \"string\",\n"
-        "        \"benefit\": \"string\"\n"
-        "      }\n"
-        "    ],\n"
-        "    \"expected_improvements\": [\n"
-        "      {\n"
-        "        \"metric\": \"maintainability|scalability|performance|security|delivery_speed\",\n"
-        "        \"current_baseline\": \"string\",\n"
-        "        \"target_outcome\": \"string\",\n"
-        "        \"why_it_improves\": \"string\"\n"
-        "      }\n"
-        "    ],\n"
-    ) if mode == "brownfield" else ""
-    brownfield_rule = (
-        "- For brownfield mode, include concrete current_codebase_faults, comparison_old_vs_new, and expected_improvements.\n"
-        if mode == "brownfield"
-        else ""
-    )
-
-    prompt = (
+    prompt_narrative = (
         "You are an expert software architect.\n\n"
+        f"{PROMPT_GROUNDING}\n"
         "Based on the following context, build or refactor the architecture.\n\n"
         f"{context}\n\n"
         "--- PAST ARCHITECTURAL KNOWLEDGE (RAG Memory) ---\n"
@@ -87,88 +65,45 @@ def architecture_agent(state: AgentState) -> AgentState:
         "2. For each Topic/Module, list the exact class/component names to be built.\n"
         "3. Describe how components connect (API calls, composition, events, inheritance).\n"
         "4. Suggest key design patterns for those relationships.\n"
-        "5. Generate a Mermaid dependency graph using a fenced block: ```mermaid\\ngraph TD\\n...\\n```\n\n"
-        "Then, at the very end, output a STRICT JSON block in this exact format (no trailing commas, no comments, no additional keys outside \"results\"):\n\n"
-        "```json\n"
-        "{\n"
-        "  \"results\": {\n"
-        f"{brownfield_extra_keys}"
-        "    \"component_details\": [\n"
-        "      {\n"
-        "        \"component\": \"string\",\n"
-        "        \"functionality\": \"2-4 sentence detailed responsibility and behavior\",\n"
-        "        \"inputs\": [\"string\"],\n"
-        "        \"outputs\": [\"string\"],\n"
-        "        \"dependencies\": [\"string\"]\n"
-        "      }\n"
-        "    ],\n"
-        "    \"component_layer_mapping\": [\n"
-        "      {\n"
-        "        \"component\": \"string\",\n"
-        "        \"layer\": \"presentation|business|data|infrastructure\",\n"
-        "        \"reason\": \"string\",\n"
-        "        \"confidence\": 0\n"
-        "      }\n"
-        "    ],\n"
-        "    \"recommended_patterns\": [\n"
-        "      {\n"
-        "        \"pattern\": \"string\",\n"
-        "        \"why\": \"string\",\n"
-        "        \"confidence\": 0,\n"
-        "        \"tags\": [\"string\"]\n"
-        "      }\n"
-        "    ],\n"
-        "    \"key_decisions\": [\n"
-        "      {\n"
-        "        \"decision\": \"string\",\n"
-        "        \"rationale\": \"string\",\n"
-        "        \"alternatives\": [\"string\"]\n"
-        "      }\n"
-        "    ],\n"
-        "    \"risk_analysis\": [\n"
-        "      {\n"
-        "        \"risk\": \"string\",\n"
-        "        \"severity\": \"high|medium|low\",\n"
-        "        \"impact\": \"string\",\n"
-        "        \"likelihood\": \"high|medium|low\",\n"
-        "        \"mitigation\": \"string\"\n"
-        "      }\n"
-        "    ],\n"
-        "    \"evolution_roadmap\": [\n"
-        "      {\n"
-        "        \"phase\": \"string\",\n"
-        "        \"timeframe\": \"string\",\n"
-        "        \"goals\": [\"string\"],\n"
-        "        \"deliverables\": [\"string\"]\n"
-        "      }\n"
-        "    ],\n"
-        "    \"indicators\": {\n"
-        "      \"scalability\": 0,\n"
-        "      \"performance\": 0,\n"
-        "      \"maintainability\": 0,\n"
-        "      \"security\": 0,\n"
-        "      \"notes\": {\n"
-        "        \"scalability\": \"string\",\n"
-        "        \"performance\": \"string\",\n"
-        "        \"maintainability\": \"string\",\n"
-        "        \"security\": \"string\"\n"
-        "      }\n"
-        "    }\n"
-        "  }\n"
-        "}\n"
-        "```\n\n"
-        "Rules for JSON:\n"
+        "5. Generate a Mermaid dependency graph using a fenced block: ```mermaid\\ngraph TD\\n...\\n```\n"
+        "   Use descriptive node labels (e.g. UserController, OrderService, OrderRepository, PostgresDB). "
+        "Include at least one clear data/persistence component (Repository, DAO, ORM, or Database client) "
+        "connected to the business layer.\n\n"
+        "Keep the answer structured, detailed, and concise. Do NOT generate a JSON array."
+    )
+
+    response_narrative = llm.invoke(prompt_narrative)
+    architecture_plan = (response_narrative.content or "").strip()
+    print("\n[Architecture Agent] Plan generated. Extracting structured metrics...")
+
+    structured_llm = llm.with_structured_output(ArchitectureOutput)
+    
+    brownfield_rule = (
+        "- For brownfield mode, include concrete current_codebase_faults, comparison_old_vs_new, and expected_improvements.\n"
+        if mode == "brownfield"
+        else ""
+    )
+
+    prompt_json = (
+        "You are a strict data extractor for software architecture. "
+        "Based on the architecture plan generated below, extract the components, decisions, and risks into structured data.\n\n"
+        f"--- CONTEXT ---\n{context}\n\n"
+        f"--- ARCHITECTURE PLAN ---\n{architecture_plan}\n\n"
+        "Rules:\n"
         "- Use integers 0-100 for indicators and confidence.\n"
         f"{brownfield_rule}"
         "- component_details must include every major component from the decomposition and Mermaid graph.\n"
-        "- functionality must be concrete and specific (avoid generic labels like 'handles logic').\n"
-        "- component_layer_mapping must include every major component from the decomposition and Mermaid graph.\n"
-        "- layer must be one of: presentation, business, data, infrastructure.\n"
-        "- Provide 3-5 items per list where possible.\n"
-        "- Keep strings concise and professional.\n\n"
-        "Keep the rest of the answer structured, detailed, and concise.\n"
+        "- functionality CANNOT be empty or generic. You MUST provide a concrete 2-4 sentence description for each component's behavior/responsibility for both new AND existing components.\n"
+        "- component_layer_mapping must include ONE entry per component in component_details.\n"
+        "- You may use the standard architectural layers (presentation, business, data, infrastructure) OR create additional contextual layers (e.g., shared, external, worker) if needed to accurately model the refactored architecture.\n"
+        "- Keep strings concise and professional.\n"
     )
 
-    response = llm.invoke(prompt)
-    print("\n[Architecture Agent] Plan generated.")
-    return {"architecture_plan": (response.content or "").strip()}
+    try:
+        results_obj = structured_llm.invoke(prompt_json)
+        results = results_obj.model_dump() if hasattr(results_obj, "model_dump") else results_obj.dict()
+    except Exception as e:
+        print(f"[Architecture Agent] Warning: Structured extraction failed: {e}")
+        results = {}
+
+    return {"architecture_plan": architecture_plan, "results": results}

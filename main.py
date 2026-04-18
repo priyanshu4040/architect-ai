@@ -12,6 +12,7 @@ from langgraph.graph import StateGraph
 from agents.state import AgentState
 from agents.greenfield import architecture_agent
 from agents.brownfield import code_agent
+from agents.analysis import analysis_agent
 from agents.router import router
 from agents.utils import read_codebase
 from agents.ast_parser import generate_ast_summary
@@ -23,15 +24,16 @@ from agents.graph_builder import generate_d3_from_ast_summary, generate_d3_graph
 # ─────────────────────────────────────────────
 builder = StateGraph(AgentState)
 
-# Register agent nodes
+# Register agent nodes (match backend service.py: code → analysis → architecture)
 builder.add_node("architecture", architecture_agent)
 builder.add_node("code", code_agent)
+builder.add_node("analysis", analysis_agent)
 
 # Set router as the conditional entry point
 builder.set_conditional_entry_point(router)
 
-# Brownfield flows into Greenfield for architecture refactoring
-builder.add_edge("code", "architecture")
+builder.add_edge("code", "analysis")
+builder.add_edge("analysis", "architecture")
 
 # Only Architecture Agent is the terminal node now
 builder.set_finish_point("architecture")
@@ -133,7 +135,8 @@ def main():
             "past_memory": past_memory,
             "ast_summary": ast_summary_text,
             "analysis_report": "",
-            "architecture_plan": ""
+            "architecture_plan": "",
+            "nfr_context": "",
         })
 
         # ── Display result ──

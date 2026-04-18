@@ -6,10 +6,24 @@ from pydantic import BaseModel, Field
 class AnalyzeRequest(BaseModel):
     mode: Literal["greenfield", "brownfield"]
     input: str = Field(..., min_length=1, description="Requirements text, code, or path.")
+    project_name: Optional[str] = None
+    scalability: Optional[int] = Field(None, ge=0, le=100)
+    performance: Optional[int] = Field(None, ge=0, le=100)
+    maintainability: Optional[int] = Field(None, ge=0, le=100)
+    security: Optional[int] = Field(None, ge=0, le=100)
+    expected_users: Optional[str] = None
+    growth_rate: Optional[str] = None
 
 
 class GreenfieldRequest(BaseModel):
     requirements: str = Field(..., min_length=1)
+    project_name: Optional[str] = None
+    scalability: Optional[int] = Field(None, ge=0, le=100)
+    performance: Optional[int] = Field(None, ge=0, le=100)
+    maintainability: Optional[int] = Field(None, ge=0, le=100)
+    security: Optional[int] = Field(None, ge=0, le=100)
+    expected_users: Optional[str] = None
+    growth_rate: Optional[str] = None
 
 
 class BrownfieldRequest(BaseModel):
