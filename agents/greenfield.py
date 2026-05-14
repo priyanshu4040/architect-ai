@@ -1,8 +1,3 @@
-"""
-Architecture Agent (Greenfield)
-Takes requirements for a NEW system and returns an architecture plan.
-"""
-
 from agents.state import AgentState
 from agents.utils import PROMPT_GROUNDING
 from agents.schemas import ArchitectureOutput
@@ -11,13 +6,45 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-groq_api_key = os.getenv("GROQ_API_KEY")
-if not groq_api_key:
-    raise ValueError("GROQ_API_KEY is not set in environment.")
-
 from langchain_groq import ChatGroq
-llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_api_key)
-print("[Greenfield] Using Groq Cloud API for Llama-3...")
+
+
+def _get_llm() -> ChatGroq:
+    """Read key fresh from env at call time so .env changes + key rotation work."""
+    keys = [
+        os.getenv("GROQ_API_KEY"),
+        os.getenv("GROQ_API_KEY1"),
+        os.getenv("GROQ_API_KEY2"),
+    ]
+    key = next((k for k in keys if k), None)
+    if not key:
+        raise ValueError("No GROQ_API_KEY configured in environment.")
+    return ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=key)
+
+
+def _invoke_with_fallback(prompt: str) -> str:
+    """Try each configured Groq key in order; skip on 429 rate-limit."""
+    keys = [
+        k for k in [
+            os.getenv("GROQ_API_KEY"),
+            os.getenv("GROQ_API_KEY1"),
+            os.getenv("GROQ_API_KEY2"),
+        ] if k
+    ]
+    if not keys:
+        raise ValueError("No GROQ_API_KEY configured in environment.")
+    last_err = None
+    for key in keys:
+        try:
+            llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=key)
+            return (llm.invoke(prompt).content or "").strip()
+        except Exception as e:
+            if "429" in str(e) or "rate_limit" in str(e).lower():
+                last_err = e
+                continue
+            raise
+    raise last_err
+
 
 def architecture_agent(state: AgentState) -> AgentState:
     """
@@ -60,16 +87,31 @@ def architecture_agent(state: AgentState) -> AgentState:
         "--- PAST ARCHITECTURAL KNOWLEDGE (RAG Memory) ---\n"
         f"{past_memory}\n"
         "-------------------------------------------------\n\n"
-        "Do the following:\n"
-        "1. Provide a highly detailed modular decomposition grouped by Topic/Business Domain.\n"
-        "2. For each Topic/Module, list the exact class/component names to be built.\n"
-        "3. Describe how components connect (API calls, composition, events, inheritance).\n"
-        "4. Suggest key design patterns for those relationships.\n"
-        "5. Generate a Mermaid dependency graph using a fenced block: ```mermaid\\ngraph TD\\n...\\n```\n"
-        "   Use descriptive node labels (e.g. UserController, OrderService, OrderRepository, PostgresDB). "
-        "Include at least one clear data/persistence component (Repository, DAO, ORM, or Database client) "
-        "connected to the business layer.\n\n"
-        "Keep the answer structured, detailed, and concise. Do NOT generate a JSON array."
+        "STRICT ARCHITECTURE RULES — follow every rule exactly:\n"
+        "1. Decompose the architecture into EXACTLY FOUR layers: Presentation, Business, Data, Infrastructure.\n"
+        "2. Each layer MUST contain AT LEAST TWO named components/classes. Aim for 3-5 per layer for a realistic architecture.\n"
+        "3. Do NOT skip or merge layers. All four MUST appear in the output even if the codebase is minimal.\n"
+        "4. Infrastructure layer is MANDATORY and must include cross-cutting concerns such as:\n"
+        "   - AppConfig / ConfigLoader (application configuration management)\n"
+        "   - LoggingService / Logger (centralised logging)\n"
+        "   - ExternalApiClient / HttpClient (outbound HTTP calls to third-party services)\n"
+        "   - MessageQueue / EventBus (async messaging) — if relevant\n"
+        "   - EmailService / NotificationService — if relevant\n"
+        "   Pick the two most relevant ones for this system and name them concretely.\n"
+        "5. For brownfield mode: use ONLY real class/module names from the AST. If a layer has fewer than 2 real classes,\n"
+        "   add the minimum number of GENERAL placeholder classes needed (e.g. 'AppConfig', 'LoggingService')\n"
+        "   and clearly label them as '(placeholder — not in source)'.\n"
+        "   DO NOT invent fake classes that appear to come from the actual codebase.\n"
+        "6. For each component: state its exact class name, which layer it belongs to, and its key responsibility (1-2 sentences).\n"
+        "7. Describe inter-layer connections (API calls, composition, events, inheritance) and suggest design patterns.\n"
+        "8. Generate a Mermaid dependency graph using a fenced block: ```mermaid\ngraph TD\n...\n```\n"
+        "   IMPORTANT: Group nodes using Mermaid subgraph blocks named exactly after each layer:\n"
+        "     subgraph Presentation ... end\n"
+        "     subgraph Business ... end\n"
+        "     subgraph Data ... end\n"
+        "     subgraph Infrastructure ... end\n"
+        "   Every component MUST appear inside the correct subgraph. All four subgraphs MUST be present.\n\n"
+        "Keep the answer structured and concise. Do NOT output a JSON array."
     )
 
     response_narrative = llm.invoke(prompt_narrative)
@@ -92,10 +134,14 @@ def architecture_agent(state: AgentState) -> AgentState:
         "Rules:\n"
         "- Use integers 0-100 for indicators and confidence.\n"
         f"{brownfield_rule}"
-        "- component_details must include every major component from the decomposition and Mermaid graph.\n"
-        "- functionality CANNOT be empty or generic. You MUST provide a concrete 2-4 sentence description for each component's behavior/responsibility for both new AND existing components.\n"
-        "- component_layer_mapping must include ONE entry per component in component_details.\n"
-        "- You may use the standard architectural layers (presentation, business, data, infrastructure) OR create additional contextual layers (e.g., shared, external, worker) if needed to accurately model the refactored architecture.\n"
+        "- component_details must include every component listed in the architecture plan and Mermaid graph.\n"
+        "- functionality CANNOT be empty or generic. Provide a concrete 2-4 sentence description of each component's responsibility.\n"
+        "- component_layer_mapping must have ONE entry per component in component_details.\n"
+        "- Every component MUST be placed in one of: 'Presentation', 'Business', 'Data', 'Infrastructure'. No other layer names allowed.\n"
+        "- EVERY layer MUST have AT LEAST TWO components mapped to it. If the plan only produced one component for a layer,\n"
+        "  add a second sensible general component (e.g. 'AppConfig' for Infrastructure, 'BaseRepository' for Data)\n"
+        "  and mark its functionality as 'General placeholder to satisfy minimum layer coverage'.\n"
+        "- Infrastructure layer MUST contain at least two of: AppConfig, LoggingService, HttpClient, MessageQueue, EmailService, CacheManager, or similar cross-cutting concerns.\n"
         "- Keep strings concise and professional.\n"
     )
 

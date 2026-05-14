@@ -93,15 +93,40 @@ def _name_layer_scores(name: str) -> Dict[Layer, float]:
         ("secrets", 2.5),
         ("telemetry", 3.0),
         ("observability", 3.0),
-        ("httpclient", 3.0),
+        ("httpclient", 4.0),
+        ("webclient", 3.5),
+        ("restclient", 3.5),
         ("external", 2.0),
-        ("adapter", 2.2),  # hexagonal outbound — often infra
+        ("adapter", 2.2),
         ("consumer", 2.5),
         ("producer", 2.5),
+        # --- cross-cutting concerns always in Infrastructure ---
+        ("logging", 6.0),
+        ("logger", 6.0),
+        ("appconfig", 6.0),
+        ("configloader", 6.0),
+        ("appsettings", 5.5),
+        ("configuration", 5.0),
+        ("settings", 4.0),
+        ("environment", 3.5),
+        ("featureflag", 4.5),
+        ("cachemanager", 5.0),
+        ("cacheprovider", 4.5),
+        ("emailservice", 5.0),
+        ("notificationservice", 5.0),
+        ("notification", 3.5),
+        ("scheduler", 3.5),
+        ("circuitbreaker", 4.5),
+        ("healthcheck", 4.5),
+        ("fileservice", 4.0),
+        ("filestorage", 4.0),
     )
     for kw, wt in infra_kw:
         if kw in l:
             s["infrastructure"] += wt
+    # "config" alone is strong infra but also appears in other names — boost only when isolated
+    if re.search(r"\bconfig\b", l):
+        s["infrastructure"] += 4.5
     if re.search(r"\bclient\b", l) and s["presentation"] < 4 and "controller" not in l:
         s["infrastructure"] += 1.5
 
@@ -214,7 +239,7 @@ def _canonical_component_names(
 
 def reconcile_structured_layers(
     results: Dict[str, Any] | None,
-    graph_data: Dict[str, Any] | None,
+    graph_data: Dict[str, Any] | None = None,
 ) -> Dict[str, Any] | None:
     """
     Normalize layers, fix cross-layer mis-tags from naming signals, ensure each
@@ -226,8 +251,6 @@ def reconcile_structured_layers(
 
     out = dict(results)
     names = _canonical_component_names(out, graph_data)
-    if not names:
-        return out  # nothing to reconcile; keep agent mapping as-is
 
     existing: Dict[str, Dict[str, Any]] = {}
     raw_mapping = out.get("component_layer_mapping")
@@ -243,6 +266,8 @@ def reconcile_structured_layers(
     new_rows: List[Dict[str, Any]] = []
     touched = 0
 
+    # Only run the per-component reconciliation if there are names to process.
+    # Even when names is empty we still fall through to placeholder injection below.
     for name in names:
         row = existing.get(name.lower(), {})
         model_raw = row.get("layer")
@@ -271,12 +296,119 @@ def reconcile_structured_layers(
             }
         )
 
-    # The UI now allows dynamic layers and does not aggressively force layers to fill 4 columns.
-    # We trust the agent's architectural assignment over name-based heuristics.
-
     out["component_layer_mapping"] = new_rows
+
+    # ── Ensure every layer has AT LEAST 2 components ───────────────────────────
+    # Named sensible placeholders per layer — inject until each layer has 2.
+    LAYER_PLACEHOLDERS: Dict[str, List[Dict[str, str]]] = {
+        "presentation": [
+            {
+                "component": "DefaultApiController",
+                "func": (
+                    "* Acts as the primary HTTP entry point for the system, routing incoming "
+                    "client requests to the appropriate business-layer service. "
+                    "Handles request validation and serialisation of responses."
+                ),
+            },
+            {
+                "component": "HealthCheckEndpoint",
+                "func": (
+                    "* Exposes a liveness/readiness probe endpoint for infrastructure monitoring "
+                    "and load-balancer health checks. Returns system status without business logic."
+                ),
+            },
+        ],
+        "business": [
+            {
+                "component": "CoreDomainService",
+                "func": (
+                    "* Encapsulates the primary business rules and orchestration logic for the "
+                    "system's main domain. Coordinates repository access and enforces domain "
+                    "policies before delegating to the data layer."
+                ),
+            },
+            {
+                "component": "ValidationService",
+                "func": (
+                    "* Provides centralised input validation and business-rule enforcement across "
+                    "use-cases. Prevents invalid state from propagating into the domain or "
+                    "persistence layer."
+                ),
+            },
+        ],
+        "data": [
+            {
+                "component": "BaseRepository",
+                "func": (
+                    "* Provides a generic CRUD abstraction over the primary data store. "
+                    "All entity-specific repositories extend this class to inherit common "
+                    "persistence operations and connection management."
+                ),
+            },
+            {
+                "component": "DatabaseConnectionManager",
+                "func": (
+                    "* Manages the lifecycle of database connections, connection pooling, and "
+                    "transaction boundaries. Ensures efficient reuse of connections and clean "
+                    "rollback on failures."
+                ),
+            },
+        ],
+        "infrastructure": [
+            {
+                "component": "AppConfig",
+                "func": (
+                    "* Centralises application configuration by loading environment variables, "
+                    "secrets, and feature flags at startup. Provides a typed, validated "
+                    "configuration object consumed by all other layers."
+                ),
+            },
+            {
+                "component": "LoggingService",
+                "func": (
+                    "* Provides structured, levelled logging for the entire application. "
+                    "Wraps the underlying logging framework and ensures consistent log format, "
+                    "correlation IDs, and severity routing."
+                ),
+            },
+        ],
+    }
+
+
+    if "component_details" not in out or not isinstance(out.get("component_details"), list):
+        out["component_details"] = []
+
+    for layer_key in CANONICAL_LAYERS:
+        current_count = sum(
+            1 for row in new_rows
+            if normalize_layer(row.get("layer")) == layer_key
+        )
+        needed = max(0, 2 - current_count)
+        if needed == 0:
+            continue
+
+        pool = LAYER_PLACEHOLDERS.get(layer_key, [])
+        for p in pool[:needed]:
+            existing_names = {r.get("component", "").lower() for r in new_rows}
+            if p["component"].lower() in existing_names:
+                continue
+            new_rows.append({
+                "component": p["component"],
+                "layer": layer_key,  # always lowercase — consistent with _resolve_layer output
+                "reason": f"Placeholder — minimum 2-component coverage for {layer_key.capitalize()} layer.",
+                "confidence": 100,
+            })
+            out["component_details"].append({
+                "component": p["component"],
+                "functionality": p["func"],
+                "inputs": [],
+                "outputs": [],
+                "dependencies": [],
+            })
+            touched += 1
+
     if touched:
         out["_layer_reconcile_note"] = (
-            f"Adjusted {touched} layer assignment(s) for naming consistency and four-layer coverage."
+            f"Adjusted {touched} layer assignment(s): corrected naming + enforced minimum 2-component coverage per layer."
         )
     return out

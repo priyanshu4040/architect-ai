@@ -8,6 +8,7 @@ from fastapi import File, UploadFile
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 from .schemas import (
     AnalyzeRequest,
@@ -196,4 +197,107 @@ def forget_memory(payload: MemoryForgetRequest):
     if not ok:
         raise HTTPException(status_code=500, detail=message)
     return {"status": "ok", "message": message}
+
+
+class NfrSuggestRequest(BaseModel):
+    prompt: str
+    scalability: int = 50
+    performance: int = 50
+    maintainability: int = 50
+    security: int = 50
+
+
+class NfrSuggestResponse(BaseModel):
+    improved_prompt: str
+    suggestions: list[str]
+    reasoning: str
+
+
+@app.post("/api/suggest-nfr", response_model=NfrSuggestResponse)
+def suggest_nfr(payload: NfrSuggestRequest):
+    """
+    Use Groq (llama-3.3-70b) to analyze the user's functional requirements prompt
+    and NFR slider values and suggest concrete improvements.
+    """
+    import re as _re
+    from langchain_groq import ChatGroq
+
+    # Try both GROQ keys with fallback
+    groq_key = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY1")
+    if not groq_key:
+        raise HTTPException(status_code=500, detail="No GROQ_API_KEY configured.")
+
+    nfr_context = (
+        f"- Scalability priority: {payload.scalability}/100\n"
+        f"- Performance priority: {payload.performance}/100\n"
+        f"- Maintainability priority: {payload.maintainability}/100\n"
+        f"- Security priority: {payload.security}/100"
+    )
+
+    prompt_text = (
+        "You are a senior software architect helping a developer write better project "
+        "requirement prompts for an AI architecture planning tool.\n\n"
+        "The user has written the following functional requirements prompt:\n"
+        "---\n"
+        f"{payload.prompt}\n"
+        "---\n\n"
+        "They have also set these non-functional requirement priorities:\n"
+        f"{nfr_context}\n\n"
+        "Your job is to:\n"
+        "1. Analyze the prompt and identify what is vague, missing, or ambiguous.\n"
+        "2. Suggest a concise list of concrete improvements (3-5 bullet points).\n"
+        "3. Generate an improved, enriched version of their original prompt that "
+        "incorporates the NFR priorities and fills any gaps.\n\n"
+        "Return your response STRICTLY in the following format (use these exact headers):\n\n"
+        "### Improved Prompt\n"
+        "<the improved, rewritten prompt here - keep it as a single paragraph>\n\n"
+        "### Suggestions\n"
+        "- <suggestion 1>\n"
+        "- <suggestion 2>\n"
+        "- <suggestion 3>\n\n"
+        "### Reasoning\n"
+        "<1-2 sentences explaining why these changes make the prompt better>\n"
+    )
+
+    try:
+        llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_key)
+        response = llm.invoke(prompt_text)
+        text = (response.content or "").strip()
+
+        improved_prompt = ""
+        suggestions = []
+        reasoning = ""
+
+        imp_match = _re.search(r"### Improved Prompt\n([\s\S]*?)(?=###|$)", text)
+        sug_match = _re.search(r"### Suggestions\n([\s\S]*?)(?=###|$)", text)
+        rea_match = _re.search(r"### Reasoning\n([\s\S]*?)(?=###|$)", text)
+
+        if imp_match:
+            improved_prompt = imp_match.group(1).strip()
+        if sug_match:
+            raw_sug = sug_match.group(1).strip()
+            suggestions = [s.lstrip("- ").strip() for s in raw_sug.splitlines() if s.strip().startswith("-")]
+        if rea_match:
+            reasoning = rea_match.group(1).strip()
+
+        if not improved_prompt:
+            improved_prompt = payload.prompt
+        if not suggestions:
+            suggestions = [
+                "Add specific technology stack constraints (e.g., language, framework).",
+                "Specify the expected scale, load, or number of concurrent users.",
+                "Clarify integration requirements with external systems or APIs.",
+            ]
+        if not reasoning:
+            reasoning = "The improved prompt gives the architecture agent more concrete context to produce a grounded plan."
+
+        return NfrSuggestResponse(
+            improved_prompt=improved_prompt,
+            suggestions=suggestions,
+            reasoning=reasoning,
+        )
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Prompt suggestion failed: {exc}") from exc
+
 

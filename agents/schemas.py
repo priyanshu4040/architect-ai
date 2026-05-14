@@ -28,7 +28,7 @@ class ComponentDetail(BaseModel):
 
 class ComponentLayerMapping(BaseModel):
     component: str
-    layer: str = Field(description="The architectural layer (e.g., presentation, business, data, infrastructure, shared, specific domain).")
+    layer: Literal["Presentation", "Business", "Data", "Infrastructure"] = Field(description="The architectural layer. Must be strictly one of: Presentation, Business, Data, Infrastructure.")
     reason: str
     confidence: int = Field(ge=0, le=100)
 

@@ -1,0 +1,1431 @@
+{
+  "meta": {
+    "tool": "Architect-Ai Memory",
+    "version": "1.0.0",
+    "description": "This is a knowledge base — a human-readable representation of what the ChromaDB vector store would contain after training on real codebases. Each entry represents a parsed codebase with detected patterns, smells, and architectural insights.",
+    "generated_at": "2026-04-30T06:38:50.781149",
+    "total_codebases": 3,
+    "note": "In production, these entries are chunked and stored as vector embeddings in ChromaDB using Ollama nomic-embed-text. Retrieved at query time via semantic similarity search (k=3)."
+  },
+  "memory_entries": [
+    {
+      "source": "DesignPatterns-master.zip",
+      "codebase_name": "DesignPatterns-master",
+      "indexed_at": "2026-04-30T06:38:41.777579",
+      "stats": {
+        "files_parsed": 38,
+        "total_classes": 46,
+        "total_functions": 187,
+        "languages": {
+          "csharp": 23,
+          "js": 15
+        }
+      },
+      "design_patterns_detected": [
+        "Factory",
+        "Abstract Factory",
+        "Decorator",
+        "Observer",
+        "Command",
+        "Iterator",
+        "State",
+        "Composite"
+      ],
+      "code_smells_detected": [
+        "God File (too many functions: 25) → jquery-1.10.2.min.js"
+      ],
+      "top_components": {
+        "classes": [
+          "MvcApplication",
+          "Startup",
+          "BundleConfig",
+          "FilterConfig",
+          "RouteConfig",
+          "HomeController",
+          "Relay",
+          "HubClient",
+          "attribute",
+          "names",
+          "name",
+          "to",
+          "value",
+          "should",
+          "over",
+          "on",
+          "label",
+          "method",
+          "rule",
+          "from",
+          "HubBufferGrain",
+          "HubGateway",
+          "HubGrain",
+          "PublisherGrain",
+          "Event",
+          "Notification",
+          "WorkerRole",
+          "DoStuffFactory",
+          "DoStuffReference",
+          "DoStuffMethodInvoker"
+        ],
+        "functions": [
+          "Application_Start",
+          "Configuration",
+          "RegisterBundles",
+          "RegisterGlobalFilters",
+          "RegisterRoutes",
+          "Observe",
+          "Spawn",
+          "Initialize",
+          "On",
+          "transitionEnd",
+          "removeElement",
+          "clearMenus",
+          "getParent",
+          "complete",
+          "ScrollSpy",
+          "next",
+          "b",
+          "c",
+          "e",
+          "that",
+          "on",
+          "to",
+          "is",
+          "should",
+          "returns",
+          "object",
+          "can",
+          "and",
+          "whose",
+          "the"
+        ]
+      },
+      "architecture_summary": "=== CODEBASE: DesignPatterns-master ===\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Global.asax.cs\n  Classes: MvcApplication\n  Functions: Application_Start\n  Imports: System.Linq, System.Web, System.Web.Mvc, System.Web.Optimization, System.Web.Routing\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Startup.cs\n  Classes: Startup\n  Functions: Configuration\n  Imports: System.Linq, Owin, Microsoft.Owin\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\App_Start\\BundleConfig.cs\n  Classes: BundleConfig\n  Functions: RegisterBundles\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\App_Start\\FilterConfig.cs\n  Classes: FilterConfig\n  Functions: RegisterGlobalFilters\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\App_Start\\RouteConfig.cs\n  Classes: RouteConfig\n  Functions: RegisterRoutes\n  Imports: System.Linq, System.Web.Mvc, System.Web.Routing\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Controllers\\HomeController.cs\n  Classes: HomeController\n  Functions: Observe, Spawn\n  Imports: System.Collections.Generic, System.IO, System.Linq, System.Threading.Tasks, System.Web.Mvc, Orleans, Orleans.Host, Sample.Hubs\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Hubs\\Relay.cs\n  Classes: Relay, HubClient\n  Functions: Initialize, On\n  Imports: System.Linq, System.Threading.Tasks, Microsoft.AspNet.SignalR.Hubs, Microsoft.AspNet.SignalR, Orleans.Runtime\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Properties\\AssemblyInfo.cs\n  Imports: System.Runtime.CompilerServices, System.Runtime.InteropServices\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\bootstrap.js\n  Functions: transitionEnd, removeElement, clearMenus, getParent, complete, ScrollSpy, next\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\bootstrap.min.js\n  Functions: b, c, e\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery-1.10.2.intellisense.js\n  Classes: attribute, names, name, to, value, should\n  Functions: that, on, to, is, should, returns, object, can, and, whose\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery-1.10.2.js\n  Classes: over, names, name\n  Functions: the, so, wherever, for, to, access, values, doScrollCheck, isArraylike, Sizzle\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery-1.10.2.min.js\n  Functions: o, M, at, st, t, lt, ut, ct, pt, ft\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.signalR-2.0.1.js\n  Functions: member, validateTransport, getDefaultPort, addDefaultPort, ConnectingMessageBuffer, to, call, checkIfAlive, isConnectedOrReconnecting, addConnectionData\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.signalR-2.0.1.min.js\n  Functions: w, b, l, k, f, o, s, e, u, h\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate-vsdoc.js\n  Classes: to, on, label, method, rule\n  Functions: handle, delegate, and, created, handler\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate.js\n  Classes: to, on, label\n  Functions: handle, delegate\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate.min.js\n  Functions: s, e\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate.unobtrusive.js\n  Functions: setValidationValues, splitAndTrim, escapeAttributeValue, getModelPrefix, appendModelPrefix, onError, onErrors, onSuccess, onReset, validationInfo\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate.unobtrusive.min.js\n  Functions: c, j, f, h, g, m, l, k, n, i",
+      "architectural_insights": [
+        "Codebase 'DesignPatterns-master' is primarily written in CSHARP with 46 classes across 38 files.",
+        "Detected 8 design pattern(s): Factory, Abstract Factory, Decorator, Observer, Command, Iterator. These patterns indicate a well-structured object-oriented architecture.",
+        "Factory pattern usage promotes loose coupling and supports Open/Closed principle.",
+        "Observer/Event pattern detected — good for decoupled event-driven systems.",
+        "Decorator pattern allows behavior extension without subclassing.",
+        "Command pattern encapsulates requests as objects, enabling undo/redo and queuing.",
+        "Code quality concerns: 1 potential smell(s) detected. Review flagged files for refactoring opportunities.",
+        "Recommended architecture layer for this knowledge: business/domain layer patterns. Reusable across similar OOP design challenges."
+      ],
+      "file_breakdown": [
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Global.asax.cs",
+          "lang": "csharp",
+          "classes": [
+            "MvcApplication"
+          ],
+          "functions": [
+            "Application_Start"
+          ],
+          "imports": [
+            "System.Linq",
+            "System.Web",
+            "System.Web.Mvc",
+            "System.Web.Optimization",
+            "System.Web.Routing"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Startup.cs",
+          "lang": "csharp",
+          "classes": [
+            "Startup"
+          ],
+          "functions": [
+            "Configuration"
+          ],
+          "imports": [
+            "System.Linq",
+            "Owin",
+            "Microsoft.Owin"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\App_Start\\BundleConfig.cs",
+          "lang": "csharp",
+          "classes": [
+            "BundleConfig"
+          ],
+          "functions": [
+            "RegisterBundles"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\App_Start\\FilterConfig.cs",
+          "lang": "csharp",
+          "classes": [
+            "FilterConfig"
+          ],
+          "functions": [
+            "RegisterGlobalFilters"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\App_Start\\RouteConfig.cs",
+          "lang": "csharp",
+          "classes": [
+            "RouteConfig"
+          ],
+          "functions": [
+            "RegisterRoutes"
+          ],
+          "imports": [
+            "System.Linq",
+            "System.Web.Mvc",
+            "System.Web.Routing"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Controllers\\HomeController.cs",
+          "lang": "csharp",
+          "classes": [
+            "HomeController"
+          ],
+          "functions": [
+            "Observe",
+            "Spawn"
+          ],
+          "imports": [
+            "System.Collections.Generic",
+            "System.IO",
+            "System.Linq",
+            "System.Threading.Tasks",
+            "System.Web.Mvc",
+            "Orleans"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Hubs\\Relay.cs",
+          "lang": "csharp",
+          "classes": [
+            "Relay",
+            "HubClient"
+          ],
+          "functions": [
+            "Initialize",
+            "On"
+          ],
+          "imports": [
+            "System.Linq",
+            "System.Threading.Tasks",
+            "Microsoft.AspNet.SignalR.Hubs",
+            "Microsoft.AspNet.SignalR",
+            "Orleans.Runtime"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Properties\\AssemblyInfo.cs",
+          "lang": "csharp",
+          "classes": [],
+          "functions": [],
+          "imports": [
+            "System.Runtime.CompilerServices",
+            "System.Runtime.InteropServices"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\bootstrap.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "transitionEnd",
+            "removeElement",
+            "clearMenus",
+            "getParent",
+            "complete",
+            "ScrollSpy",
+            "next"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\bootstrap.min.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "b",
+            "c",
+            "e"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery-1.10.2.intellisense.js",
+          "lang": "js",
+          "classes": [
+            "attribute",
+            "names",
+            "name",
+            "to",
+            "value",
+            "should"
+          ],
+          "functions": [
+            "that",
+            "on",
+            "to",
+            "is",
+            "should",
+            "returns",
+            "object",
+            "can"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery-1.10.2.js",
+          "lang": "js",
+          "classes": [
+            "over",
+            "names",
+            "name"
+          ],
+          "functions": [
+            "the",
+            "so",
+            "wherever",
+            "for",
+            "to",
+            "access",
+            "values",
+            "doScrollCheck"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery-1.10.2.min.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "o",
+            "M",
+            "at",
+            "st",
+            "t",
+            "lt",
+            "ut",
+            "ct"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.signalR-2.0.1.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "member",
+            "validateTransport",
+            "getDefaultPort",
+            "addDefaultPort",
+            "ConnectingMessageBuffer",
+            "to",
+            "call",
+            "checkIfAlive"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.signalR-2.0.1.min.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "w",
+            "b",
+            "l",
+            "k",
+            "f",
+            "o",
+            "s",
+            "e"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate-vsdoc.js",
+          "lang": "js",
+          "classes": [
+            "to",
+            "on",
+            "label",
+            "method",
+            "rule"
+          ],
+          "functions": [
+            "handle",
+            "delegate",
+            "and",
+            "created",
+            "handler"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate.js",
+          "lang": "js",
+          "classes": [
+            "to",
+            "on",
+            "label"
+          ],
+          "functions": [
+            "handle",
+            "delegate"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate.min.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "s",
+            "e"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate.unobtrusive.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "setValidationValues",
+            "splitAndTrim",
+            "escapeAttributeValue",
+            "getModelPrefix",
+            "appendModelPrefix",
+            "onError",
+            "onErrors",
+            "onSuccess"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\jquery.validate.unobtrusive.min.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "c",
+            "j",
+            "f",
+            "h",
+            "g",
+            "m",
+            "l",
+            "k"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\modernizr-2.6.2.js",
+          "lang": "js",
+          "classes": [
+            "from"
+          ],
+          "functions": [
+            "isEventSupported",
+            "bind",
+            "setCss",
+            "setCssAll",
+            "is",
+            "contains",
+            "testProps",
+            "testDOMProps"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\respond.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "callMedia"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Client\\Scripts\\respond.min.js",
+          "lang": "js",
+          "classes": [],
+          "functions": [
+            "t"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Grains\\HubBufferGrain.cs",
+          "lang": "csharp",
+          "classes": [
+            "HubBufferGrain"
+          ],
+          "functions": [
+            "Publish"
+          ],
+          "imports": [
+            "System.Collections.Generic",
+            "System.Linq",
+            "System.Threading.Tasks",
+            "Orleans",
+            "Orleans.Concurrency"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Grains\\HubGateway.cs",
+          "lang": "csharp",
+          "classes": [
+            "HubGateway"
+          ],
+          "functions": [
+            "Init",
+            "Publish",
+            "GetHub",
+            "GetLocalHub",
+            "LocalHubId",
+            "LocalAddress"
+          ],
+          "imports": [
+            "System.Diagnostics",
+            "System.Linq",
+            "System.Net",
+            "System.Threading.Tasks",
+            "Orleans.Providers"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Grains\\HubGrain.cs",
+          "lang": "csharp",
+          "classes": [
+            "HubGrain"
+          ],
+          "functions": [
+            "Init",
+            "Subscribe",
+            "Unsubscribe",
+            "Publish"
+          ],
+          "imports": [
+            "System.Linq",
+            "System.Threading.Tasks",
+            "Orleans",
+            "Orleans.Concurrency"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Grains\\PublisherGrain.cs",
+          "lang": "csharp",
+          "classes": [
+            "PublisherGrain"
+          ],
+          "functions": [],
+          "imports": [
+            "System.Linq",
+            "System.Threading.Tasks",
+            "Orleans"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Interfaces\\IHub.cs",
+          "lang": "csharp",
+          "classes": [
+            "Event",
+            "Notification"
+          ],
+          "functions": [],
+          "imports": [
+            "System.Linq",
+            "System.Threading.Tasks",
+            "Orleans",
+            "Orleans.Concurrency",
+            "Orleans.Placement"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Interfaces\\IPublisher.cs",
+          "lang": "csharp",
+          "classes": [],
+          "functions": [],
+          "imports": [
+            "System.Linq",
+            "System.Threading.Tasks"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Hub\\Silo\\WorkerRole.cs",
+          "lang": "csharp",
+          "classes": [
+            "WorkerRole"
+          ],
+          "functions": [],
+          "imports": [
+            "System.Diagnostics",
+            "System.Linq",
+            "System.Net",
+            "Microsoft.WindowsAzure",
+            "Microsoft.WindowsAzure.Diagnostics",
+            "Microsoft.WindowsAzure.ServiceRuntime"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Observer\\GrainInterfaces\\IGrain1.cs",
+          "lang": "csharp",
+          "classes": [],
+          "functions": [],
+          "imports": [
+            "System.Collections.Generic",
+            "System.Threading.Tasks",
+            "Orleans"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Observer\\GrainInterfaces\\Properties\\AssemblyInfo.cs",
+          "lang": "csharp",
+          "classes": [],
+          "functions": [],
+          "imports": [
+            "System.Runtime.CompilerServices",
+            "System.Runtime.InteropServices"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Observer\\GrainInterfaces\\Properties\\orleans.codegen.cs",
+          "lang": "csharp",
+          "classes": [
+            "DoStuffFactory",
+            "DoStuffReference",
+            "DoStuffMethodInvoker",
+            "DoStuffProperties",
+            "ObserveFactory",
+            "ObserveReference",
+            "ObserveMethodInvoker",
+            "ObserveProperties"
+          ],
+          "functions": [
+            "GetGrain",
+            "Cast",
+            "DoStuffReference",
+            "_Copier",
+            "_Serializer",
+            "_Deserializer",
+            "GetMethodName",
+            "DeleteObjectReference"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Observer\\Grains\\Grain1.cs",
+          "lang": "csharp",
+          "classes": [
+            "MyGrain"
+          ],
+          "functions": [
+            "SubscribeForUpdates",
+            "SendOutUpdates"
+          ],
+          "imports": [
+            "System.Collections.Generic",
+            "System.Linq",
+            "System.Threading.Tasks",
+            "System.Text",
+            "Orleans"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Observer\\Grains\\Properties\\AssemblyInfo.cs",
+          "lang": "csharp",
+          "classes": [],
+          "functions": [],
+          "imports": [
+            "System.Runtime.CompilerServices",
+            "System.Runtime.InteropServices"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Observer\\Observer\\OrleansHostWrapper.cs",
+          "lang": "csharp",
+          "classes": [
+            "OrleansHostWrapper"
+          ],
+          "functions": [
+            "Run",
+            "Stop",
+            "Init",
+            "ParseArguments",
+            "PrintUsage",
+            "Dispose"
+          ],
+          "imports": [
+            "System.Net",
+            "Orleans.Host.SiloHost"
+          ]
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Observer\\Observer\\Program.cs",
+          "lang": "csharp",
+          "classes": [
+            "Program",
+            "for",
+            "TheObserver"
+          ],
+          "functions": [
+            "StuffUpdate"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatterns-master\\samples\\Observer\\Observer\\Properties\\AssemblyInfo.cs",
+          "lang": "csharp",
+          "classes": [],
+          "functions": [],
+          "imports": [
+            "System.Runtime.CompilerServices",
+            "System.Runtime.InteropServices"
+          ]
+        }
+      ]
+    },
+    {
+      "source": "DesignPatternsJava9-master.zip",
+      "codebase_name": "DesignPatternsJava9-master",
+      "indexed_at": "2026-04-30T06:38:42.338238",
+      "stats": {
+        "files_parsed": 2,
+        "total_classes": 2,
+        "total_functions": 2,
+        "languages": {
+          "java": 2
+        }
+      },
+      "design_patterns_detected": [
+        "Iterator",
+        "Abstract Factory",
+        "Command",
+        "State",
+        "Strategy",
+        "Proxy"
+      ],
+      "code_smells_detected": [],
+      "top_components": {
+        "classes": [
+          "ClientMain"
+        ],
+        "functions": [
+          "main"
+        ]
+      },
+      "architecture_summary": "=== CODEBASE: DesignPatternsJava9-master ===\n\n[FILE] DesignPatternsJava9-master\\pattern\\src\\com\\premaseem\\ClientMain.java\n  Classes: ClientMain\n  Functions: main\n\n[FILE] DesignPatternsJava9-master\\patternBonus\\src\\com\\premaseem\\ClientMain.java\n  Classes: ClientMain\n  Functions: main",
+      "architectural_insights": [
+        "Codebase 'DesignPatternsJava9-master' is primarily written in JAVA with 2 classes across 2 files.",
+        "No major code smells detected — codebase appears well-modularized.",
+        "Recommended architecture layer for this knowledge: business/domain layer patterns. Reusable across similar OOP design challenges."
+      ],
+      "file_breakdown": [
+        {
+          "file": "DesignPatternsJava9-master\\pattern\\src\\com\\premaseem\\ClientMain.java",
+          "lang": "java",
+          "classes": [
+            "ClientMain"
+          ],
+          "functions": [
+            "main"
+          ],
+          "imports": []
+        },
+        {
+          "file": "DesignPatternsJava9-master\\patternBonus\\src\\com\\premaseem\\ClientMain.java",
+          "lang": "java",
+          "classes": [
+            "ClientMain"
+          ],
+          "functions": [
+            "main"
+          ],
+          "imports": []
+        }
+      ]
+    },
+    {
+      "source": "refactoring-code_smells-design_patterns-main.zip",
+      "codebase_name": "refactoring-code_smells-design_patterns-main",
+      "indexed_at": "2026-04-30T06:38:50.779995",
+      "stats": {
+        "files_parsed": 60,
+        "total_classes": 60,
+        "total_functions": 28,
+        "languages": {
+          "csharp": 44,
+          "java": 16
+        }
+      },
+      "design_patterns_detected": [],
+      "code_smells_detected": [],
+      "top_components": {
+        "classes": [
+          "Booking",
+          "BookingId",
+          "CustomerId",
+          "CustomerName",
+          "DiscountValue",
+          "EmailAddress",
+          "TaxValue",
+          "BookingShould",
+          "Customer",
+          "DateRange",
+          "Discount",
+          "Tax"
+        ],
+        "functions": [
+          "StatusFor",
+          "GetTheCorrectStatusWhenTheBookingHasNotStartedYet",
+          "GetTheCorrectStatusWhenTheBookingIsCurrentlyActive",
+          "GetTheCorrectStatusWhenTheBookingIsFinished",
+          "IsBetween",
+          "IsAfter",
+          "statusFor",
+          "id",
+          "name",
+          "emailAddress",
+          "startDate",
+          "endDate",
+          "type",
+          "value"
+        ]
+      },
+      "architecture_summary": "=== CODEBASE: refactoring-code_smells-design_patterns-main ===\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\Booking.cs\n  Classes: Booking\n  Functions: StatusFor\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\BookingId.cs\n  Classes: BookingId\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\CustomerId.cs\n  Classes: CustomerId\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\CustomerName.cs\n  Classes: CustomerName\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\DiscountValue.cs\n  Classes: DiscountValue\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\EmailAddress.cs\n  Classes: EmailAddress\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\TaxValue.cs\n  Classes: TaxValue\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\test\\Booking.Tests\\BookingShould.cs\n  Classes: BookingShould\n  Functions: GetTheCorrectStatusWhenTheBookingHasNotStartedYet, GetTheCorrectStatusWhenTheBookingIsCurrentlyActive, GetTheCorrectStatusWhenTheBookingIsFinished\n  Imports: Xunit\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\Booking.cs\n  Classes: Booking\n  Functions: StatusFor\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\BookingId.cs\n  Classes: BookingId\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\Customer.cs\n  Classes: Customer\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\CustomerId.cs\n  Classes: CustomerId\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\CustomerName.cs\n  Classes: CustomerName\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\DateRange.cs\n  Classes: DateRange\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\Discount.cs\n  Classes: Discount\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\DiscountValue.cs\n  Classes: DiscountValue\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\EmailAddress.cs\n  Classes: EmailAddress\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\Tax.cs\n  Classes: Tax\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\TaxValue.cs\n  Classes: TaxValue\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\test\\Booking.Tests\\BookingShould.cs\n  Classes: BookingShould\n  Functions: GetTheCorrectStatusWhenTheBookingHasNotStartedYet, GetTheCorrectStatusWhenTheBookingIsCurrentlyActive, GetTheCorrectStatusWhenTheBookingIsFinished\n  Imports: Xunit",
+      "architectural_insights": [
+        "Codebase 'refactoring-code_smells-design_patterns-main' is primarily written in CSHARP with 60 classes across 60 files.",
+        "No major code smells detected — codebase appears well-modularized.",
+        "Recommended architecture layer for this knowledge: business/domain layer patterns. Reusable across similar OOP design challenges."
+      ],
+      "file_breakdown": [
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\Booking.cs",
+          "lang": "csharp",
+          "classes": [
+            "Booking"
+          ],
+          "functions": [
+            "StatusFor"
+          ],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\BookingId.cs",
+          "lang": "csharp",
+          "classes": [
+            "BookingId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\CustomerId.cs",
+          "lang": "csharp",
+          "classes": [
+            "CustomerId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\CustomerName.cs",
+          "lang": "csharp",
+          "classes": [
+            "CustomerName"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\DiscountValue.cs",
+          "lang": "csharp",
+          "classes": [
+            "DiscountValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\EmailAddress.cs",
+          "lang": "csharp",
+          "classes": [
+            "EmailAddress"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\TaxValue.cs",
+          "lang": "csharp",
+          "classes": [
+            "TaxValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\test\\Booking.Tests\\BookingShould.cs",
+          "lang": "csharp",
+          "classes": [
+            "BookingShould"
+          ],
+          "functions": [
+            "GetTheCorrectStatusWhenTheBookingHasNotStartedYet",
+            "GetTheCorrectStatusWhenTheBookingIsCurrentlyActive",
+            "GetTheCorrectStatusWhenTheBookingIsFinished"
+          ],
+          "imports": [
+            "Xunit"
+          ]
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\Booking.cs",
+          "lang": "csharp",
+          "classes": [
+            "Booking"
+          ],
+          "functions": [
+            "StatusFor"
+          ],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\BookingId.cs",
+          "lang": "csharp",
+          "classes": [
+            "BookingId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\Customer.cs",
+          "lang": "csharp",
+          "classes": [
+            "Customer"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\CustomerId.cs",
+          "lang": "csharp",
+          "classes": [
+            "CustomerId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\CustomerName.cs",
+          "lang": "csharp",
+          "classes": [
+            "CustomerName"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\DateRange.cs",
+          "lang": "csharp",
+          "classes": [
+            "DateRange"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\Discount.cs",
+          "lang": "csharp",
+          "classes": [
+            "Discount"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\DiscountValue.cs",
+          "lang": "csharp",
+          "classes": [
+            "DiscountValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\EmailAddress.cs",
+          "lang": "csharp",
+          "classes": [
+            "EmailAddress"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\Tax.cs",
+          "lang": "csharp",
+          "classes": [
+            "Tax"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\src\\Booking\\TaxValue.cs",
+          "lang": "csharp",
+          "classes": [
+            "TaxValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-02_introduce_parameter_object\\test\\Booking.Tests\\BookingShould.cs",
+          "lang": "csharp",
+          "classes": [
+            "BookingShould"
+          ],
+          "functions": [
+            "GetTheCorrectStatusWhenTheBookingHasNotStartedYet",
+            "GetTheCorrectStatusWhenTheBookingIsCurrentlyActive",
+            "GetTheCorrectStatusWhenTheBookingIsFinished"
+          ],
+          "imports": [
+            "Xunit"
+          ]
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\Booking.cs",
+          "lang": "csharp",
+          "classes": [
+            "Booking"
+          ],
+          "functions": [
+            "StatusFor",
+            "IsBetween"
+          ],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\BookingId.cs",
+          "lang": "csharp",
+          "classes": [
+            "BookingId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\Customer.cs",
+          "lang": "csharp",
+          "classes": [
+            "Customer"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\CustomerId.cs",
+          "lang": "csharp",
+          "classes": [
+            "CustomerId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\CustomerName.cs",
+          "lang": "csharp",
+          "classes": [
+            "CustomerName"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\DateRange.cs",
+          "lang": "csharp",
+          "classes": [
+            "DateRange"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\Discount.cs",
+          "lang": "csharp",
+          "classes": [
+            "Discount"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\DiscountValue.cs",
+          "lang": "csharp",
+          "classes": [
+            "DiscountValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\EmailAddress.cs",
+          "lang": "csharp",
+          "classes": [
+            "EmailAddress"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\Tax.cs",
+          "lang": "csharp",
+          "classes": [
+            "Tax"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\src\\Booking\\TaxValue.cs",
+          "lang": "csharp",
+          "classes": [
+            "TaxValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-03_preserve_whole_object\\test\\Booking.Tests\\BookingShould.cs",
+          "lang": "csharp",
+          "classes": [
+            "BookingShould"
+          ],
+          "functions": [
+            "GetTheCorrectStatusWhenTheBookingHasNotStartedYet",
+            "GetTheCorrectStatusWhenTheBookingIsCurrentlyActive",
+            "GetTheCorrectStatusWhenTheBookingIsFinished"
+          ],
+          "imports": [
+            "Xunit"
+          ]
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\Booking.cs",
+          "lang": "csharp",
+          "classes": [
+            "Booking"
+          ],
+          "functions": [
+            "StatusFor"
+          ],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\BookingId.cs",
+          "lang": "csharp",
+          "classes": [
+            "BookingId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\Customer.cs",
+          "lang": "csharp",
+          "classes": [
+            "Customer"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\CustomerId.cs",
+          "lang": "csharp",
+          "classes": [
+            "CustomerId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\CustomerName.cs",
+          "lang": "csharp",
+          "classes": [
+            "CustomerName"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\DateRange.cs",
+          "lang": "csharp",
+          "classes": [
+            "DateRange"
+          ],
+          "functions": [
+            "IsBetween",
+            "IsAfter"
+          ],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\Discount.cs",
+          "lang": "csharp",
+          "classes": [
+            "Discount"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\DiscountValue.cs",
+          "lang": "csharp",
+          "classes": [
+            "DiscountValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\EmailAddress.cs",
+          "lang": "csharp",
+          "classes": [
+            "EmailAddress"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\Tax.cs",
+          "lang": "csharp",
+          "classes": [
+            "Tax"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\src\\Booking\\TaxValue.cs",
+          "lang": "csharp",
+          "classes": [
+            "TaxValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-04_tell_dont_ask\\test\\Booking.Tests\\BookingShould.cs",
+          "lang": "csharp",
+          "classes": [
+            "BookingShould"
+          ],
+          "functions": [
+            "GetTheCorrectStatusWhenTheBookingHasNotStartedYet",
+            "GetTheCorrectStatusWhenTheBookingIsCurrentlyActive",
+            "GetTheCorrectStatusWhenTheBookingIsFinished"
+          ],
+          "imports": [
+            "Xunit"
+          ]
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-01_base\\src\\main\\java\\tv\\codely\\booking\\Booking.java",
+          "lang": "java",
+          "classes": [
+            "Booking"
+          ],
+          "functions": [
+            "statusFor"
+          ],
+          "imports": [
+            "java.time.LocalDateTime"
+          ]
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-01_base\\src\\main\\java\\tv\\codely\\booking\\BookingId.java",
+          "lang": "java",
+          "classes": [
+            "BookingId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-01_base\\src\\main\\java\\tv\\codely\\booking\\CustomerId.java",
+          "lang": "java",
+          "classes": [
+            "CustomerId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-01_base\\src\\main\\java\\tv\\codely\\booking\\CustomerName.java",
+          "lang": "java",
+          "classes": [
+            "CustomerName"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-01_base\\src\\main\\java\\tv\\codely\\booking\\DiscountValue.java",
+          "lang": "java",
+          "classes": [
+            "DiscountValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-01_base\\src\\main\\java\\tv\\codely\\booking\\EmailAddress.java",
+          "lang": "java",
+          "classes": [
+            "EmailAddress"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-01_base\\src\\main\\java\\tv\\codely\\booking\\TaxValue.java",
+          "lang": "java",
+          "classes": [
+            "TaxValue"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-01_base\\src\\test\\java\\tv\\codely\\booking\\BookingShould.java",
+          "lang": "java",
+          "classes": [
+            "BookingShould"
+          ],
+          "functions": [],
+          "imports": [
+            "org.junit.jupiter.api.Test",
+            "java.time.LocalDateTime"
+          ]
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-02_introduce_parameter_object\\src\\main\\java\\tv\\codely\\booking\\Booking.java",
+          "lang": "java",
+          "classes": [
+            "Booking"
+          ],
+          "functions": [
+            "statusFor"
+          ],
+          "imports": [
+            "java.time.LocalDateTime"
+          ]
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-02_introduce_parameter_object\\src\\main\\java\\tv\\codely\\booking\\BookingId.java",
+          "lang": "java",
+          "classes": [
+            "BookingId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-02_introduce_parameter_object\\src\\main\\java\\tv\\codely\\booking\\Customer.java",
+          "lang": "java",
+          "classes": [
+            "Customer"
+          ],
+          "functions": [
+            "id",
+            "name",
+            "emailAddress"
+          ],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-02_introduce_parameter_object\\src\\main\\java\\tv\\codely\\booking\\CustomerId.java",
+          "lang": "java",
+          "classes": [
+            "CustomerId"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-02_introduce_parameter_object\\src\\main\\java\\tv\\codely\\booking\\CustomerName.java",
+          "lang": "java",
+          "classes": [
+            "CustomerName"
+          ],
+          "functions": [],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-02_introduce_parameter_object\\src\\main\\java\\tv\\codely\\booking\\DateRange.java",
+          "lang": "java",
+          "classes": [
+            "DateRange"
+          ],
+          "functions": [
+            "startDate",
+            "endDate"
+          ],
+          "imports": [
+            "java.time.LocalDateTime"
+          ]
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-02_introduce_parameter_object\\src\\main\\java\\tv\\codely\\booking\\Discount.java",
+          "lang": "java",
+          "classes": [
+            "Discount"
+          ],
+          "functions": [
+            "type",
+            "value"
+          ],
+          "imports": []
+        },
+        {
+          "file": "refactoring-code_smells-design_patterns-main\\examples\\java\\java-booking-02_introduce_parameter_object\\src\\main\\java\\tv\\codely\\booking\\DiscountValue.java",
+          "lang": "java",
+          "classes": [
+            "DiscountValue"
+          ],
+          "functions": [],
+          "imports": []
+        }
+      ]
+    }
+  ],
+  "demo_retrieval_example": {
+    "query": "How to implement the Observer pattern in Java?",
+    "top_k": 3,
+    "simulated_result": [
+      {
+        "rank": 1,
+        "source": "DesignPatterns-master.zip",
+        "relevance_score": 0.91,
+        "excerpt": "=== CODEBASE: DesignPatterns-master ===\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Global.asax.cs\n  Classes: MvcApplication\n  Functions: Application_Start\n  Imports: System.Linq, System.Web, System.Web.Mvc, System.Web.Optimization, System.Web.Routing\n\n[FILE] DesignPatterns-master\\samples\\Hub\\Client\\Startup.cs\n  Classes: Startup\n  Functions: Configuration\n  Imports: System.Linq, Owin, Microso..."
+      },
+      {
+        "rank": 2,
+        "source": "DesignPatternsJava9-master.zip",
+        "relevance_score": 0.87,
+        "excerpt": "=== CODEBASE: DesignPatternsJava9-master ===\n\n[FILE] DesignPatternsJava9-master\\pattern\\src\\com\\premaseem\\ClientMain.java\n  Classes: ClientMain\n  Functions: main\n\n[FILE] DesignPatternsJava9-master\\patternBonus\\src\\com\\premaseem\\ClientMain.java\n  Classes: ClientMain\n  Functions: main..."
+      },
+      {
+        "rank": 3,
+        "source": "refactoring-code_smells-design_patterns-main.zip",
+        "relevance_score": 0.83,
+        "excerpt": "=== CODEBASE: refactoring-code_smells-design_patterns-main ===\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\Booking.cs\n  Classes: Booking\n  Functions: StatusFor\n\n[FILE] refactoring-code_smells-design_patterns-main\\examples\\csharp\\csharp-booking-01_base\\src\\Booking\\BookingId.cs\n  Classes: BookingId\n\n[FILE] refactoring-code_smells-design_pat..."
+      }
+    ]
+  }
+}

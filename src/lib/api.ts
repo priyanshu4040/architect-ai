@@ -245,3 +245,27 @@ export function loadLastResult(): AnalyzeResponse | null {
   }
 }
 
+export interface NfrSuggestResponse {
+  improved_prompt: string;
+  suggestions: string[];
+  reasoning: string;
+}
+
+export async function suggestNfr(params: {
+  prompt: string;
+  scalability: number;
+  performance: number;
+  maintainability: number;
+  security: number;
+}): Promise<NfrSuggestResponse> {
+  const res = await fetch(`${API_BASE}/api/suggest-nfr`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+  return (await res.json()) as NfrSuggestResponse;
+}

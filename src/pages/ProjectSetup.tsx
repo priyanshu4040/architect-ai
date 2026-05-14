@@ -10,7 +10,12 @@ import {
   GitBranch, 
   Globe, 
   Layers, 
-  Server 
+  Server,
+  Sparkles,
+  Loader2,
+  ClipboardCopy,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -19,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { analyze, analyzeBrownfieldZip, saveLastResult } from "@/lib/api";
+import { analyze, analyzeBrownfieldZip, saveLastResult, suggestNfr, NfrSuggestResponse } from "@/lib/api";
 import { toast } from "sonner";
 
 type ProjectMode = "greenfield" | "brownfield";
@@ -349,6 +354,41 @@ function StepModeAndDomain({ state, updateState }: { state: WizardState; updateS
 }
 
 function StepRequirements({ state, updateState }: { state: WizardState; updateState: (u: Partial<WizardState>) => void }) {
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState<NfrSuggestResponse | null>(null);
+  const [showSuggestion, setShowSuggestion] = useState(true);
+
+  const handleImprovePrompt = async () => {
+    if (!state.functionalRequirements.trim()) {
+      toast.error("Please enter your functional requirements first.");
+      return;
+    }
+    setIsSuggesting(true);
+    setSuggestion(null);
+    try {
+      const result = await suggestNfr({
+        prompt: state.functionalRequirements,
+        scalability: state.scalability,
+        performance: state.performance,
+        maintainability: state.maintainability,
+        security: state.security,
+      });
+      setSuggestion(result);
+      setShowSuggestion(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Suggestion failed";
+      toast.error(msg);
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  const handleApplySuggestion = () => {
+    if (!suggestion) return;
+    updateState({ functionalRequirements: suggestion.improved_prompt });
+    toast.success("Improved prompt applied!");
+  };
+
   return (
     <motion.div
       key="step-3"
@@ -395,7 +435,25 @@ function StepRequirements({ state, updateState }: { state: WizardState; updateSt
       ) : (
         <div className="space-y-6">
           <div>
-            <Label htmlFor="funcReq">Functional Requirements</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="funcReq">Functional Requirements</Label>
+              <Button
+                id="improve-prompt-btn"
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleImprovePrompt}
+                disabled={isSuggesting}
+                className="gap-2 text-xs border-primary/40 text-primary hover:bg-primary/10 hover:border-primary transition-all"
+              >
+                {isSuggesting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {isSuggesting ? "Analysing..." : "✨ Improve Prompt"}
+              </Button>
+            </div>
             <Textarea
               id="funcReq"
               placeholder="Describe the main features and functionality of your system..."
@@ -404,6 +462,97 @@ function StepRequirements({ state, updateState }: { state: WizardState; updateSt
               className="mt-2 min-h-[120px]"
             />
           </div>
+
+          {/* NFR Suggestion Card */}
+          <AnimatePresence>
+            {suggestion && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="rounded-xl border border-primary/30 bg-primary/5 overflow-hidden"
+              >
+                {/* Card Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-primary/20 bg-primary/10">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold text-primary">✨ AI Prompt Suggestion</span>
+                  </div>
+                  <button
+                    onClick={() => setShowSuggestion(!showSuggestion)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showSuggestion ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                </div>
+
+                <AnimatePresence>
+                  {showSuggestion && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="p-4 space-y-4">
+                        {/* Suggestions */}
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">What to Improve</p>
+                          <ul className="space-y-1.5">
+                            {suggestion.suggestions.map((s, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                                <span className="mt-0.5 h-4 w-4 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0">{i + 1}</span>
+                                {s}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* Improved Prompt */}
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Improved Prompt</p>
+                          <div className="relative rounded-lg bg-background/60 border border-border/60 p-3">
+                            <p className="text-sm text-foreground leading-relaxed pr-8">{suggestion.improved_prompt}</p>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(suggestion.improved_prompt);
+                                toast.success("Copied to clipboard!");
+                              }}
+                              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
+                              title="Copy to clipboard"
+                            >
+                              <ClipboardCopy className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Reasoning */}
+                        {suggestion.reasoning && (
+                          <p className="text-xs text-muted-foreground italic border-t border-border/40 pt-3">
+                            💡 {suggestion.reasoning}
+                          </p>
+                        )}
+
+                        {/* Apply Button */}
+                        <Button
+                          id="apply-suggestion-btn"
+                          variant="hero"
+                          size="sm"
+                          onClick={handleApplySuggestion}
+                          className="w-full gap-2"
+                        >
+                          <ClipboardCopy className="h-3.5 w-3.5" />
+                          Apply Improved Prompt
+                        </Button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>

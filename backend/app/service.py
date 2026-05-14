@@ -926,10 +926,15 @@ def run_analysis(
     validation_corpus = "\n".join(
         [readme_text, ast_summary_text, nfr_context, _snippet]
     )
-    if structured_results:
+    # Pruning: only applies in brownfield mode.
+    # In greenfield, the LLM designs new class names that don't exist in the requirements text —
+    # pruning would silently delete most of the generated architecture.
+    # In brownfield, we only prune against the real AST (actual source classes), not the
+    # requirements snippet, to avoid removing valid domain classes that aren't in the AST yet.
+    if structured_results and mode == "brownfield" and ast_summary_text:
         structured_results, prune_note = _prune_ungrounded_component_details(
             structured_results,
-            corpus=validation_corpus,
+            corpus=ast_summary_text,  # Only check against real AST, not user text
             ast_summary=ast_summary_text,
         )
         if prune_note:
@@ -966,8 +971,42 @@ def run_analysis(
         if isinstance(lr_note, str) and lr_note.strip():
             warning = (warning + " | " if warning else "") + lr_note.strip()
 
+    # Sync placeholder components added by reconciler into the display graph.
+    # Reconciler only touches structured_results; we must push new nodes into graph_data here
+    # because graph_data was (re)built from the Mermaid plan AFTER reconcile had its reference.
+    if structured_results and isinstance(graph_data, dict):
+        existing_graph_ids = {
+            str(n.get("label") or n.get("id") or "").strip().lower()
+            for n in (graph_data.get("nodes") or [])
+            if isinstance(n, dict)
+        }
+        detail_by_name = {
+            str(d.get("component") or "").strip().lower(): str(d.get("functionality") or "")
+            for d in (structured_results.get("component_details") or [])
+            if isinstance(d, dict)
+        }
+        for row in (structured_results.get("component_layer_mapping") or []):
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("component") or "").strip()
+            if not name or name.lower() in existing_graph_ids:
+                continue
+            layer_val = normalize_layer(row.get("layer")) or str(row.get("layer") or "").lower()
+            func = detail_by_name.get(name.lower(), "* General placeholder — not in source.")
+            if "nodes" not in graph_data:
+                graph_data["nodes"] = []
+            graph_data["nodes"].append({
+                "id": name,
+                "label": name,
+                "layer": layer_val,
+                "type": "component",
+                "functionality": func,
+                "description": func,
+            })
+
     graph_data = _apply_layer_assignments(graph_data, structured_results)
     graph_data = _apply_component_details(graph_data, structured_results, mode=mode)
+
     report_document = _build_detailed_report_document(
         mode=mode,
         analysis_report=analysis_report,

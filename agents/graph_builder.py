@@ -25,67 +25,61 @@ def _layer_from_type(ntype: str) -> str:
 def _classify_component(label: str) -> tuple[str, int, str]:
     """
     Classify a component label into a coarse type + group.
-
-    Returns (type, group, description).
-    - type is a short string used by the frontend to map to layers.
-    - group is a small int for optional visualization grouping.
+    Priority: Infrastructure > Data > Presentation > Business (default)
     """
     raw = (label or "").strip()
     l = raw.lower()
 
-    # Presentation layer
-    if any(k in l for k in ("controller", "router", "handler", "api", "gateway", "ui", "view", "page", "screen", "frontend")):
-        return ("controller", 1, "Presentation/API surface")
+    # ── Infrastructure first — these keywords beat everything else ──────────────
+    infra_strong = (
+        "logging", "logger", "appconfig", "config", "configuration", "settings",
+        "emailservice", "notificationservice", "notification", "scheduler",
+        "cachemanager", "cacheprovider", "circuitbreaker", "healthcheck",
+        "messagequeue", "eventbus", "messageconsumer", "messageproducer",
+        "httpclient", "webclient", "restclient", "apiclient", "externalclient",
+        "fileservice", "filestorage", "blobstorage", "s3client",
+        "kafka", "rabbit", "smtp", "sendgrid", "vault", "secrets",
+        "telemetry", "observability", "metrics", "featureflag",
+    )
+    if any(k in l for k in infra_strong):
+        if any(k in l for k in ("queue", "kafka", "rabbit", "eventbus", "messagebus")):
+            return ("queue", 4, "Messaging/queue infrastructure")
+        if any(k in l for k in ("storage", "s3", "blob", "file")):
+            return ("storage", 4, "Storage infrastructure")
+        if any(k in l for k in ("logging", "logger", "telemetry", "metrics", "observability")):
+            return ("logger", 4, "Logging/observability infrastructure")
+        if any(k in l for k in ("config", "settings", "appconfig", "configuration", "featureflag")):
+            return ("config", 4, "Configuration infrastructure")
+        return ("client", 4, "External/infrastructure integration")
 
-    # Data layer
+    # ── Data layer ──────────────────────────────────────────────────────────────
     if any(
         k in l
         for k in (
-            "repository",
-            " repo",
-            "repo",
-            "dao",
-            "dal",
-            "db",
-            "database",
-            "postgres",
-            "mysql",
-            "mongo",
-            "sql",
-            "jdbc",
-            "persist",
-            "persistence",
-            "entity",
-            "prisma",
-            "jpa",
-            "hibernate",
-            "model",
-            "orm",
-            "query",
-            "cache",
-            "redis",
+            "repository", " repo", "repo", "dao", "dal", "db", "database",
+            "postgres", "mysql", "mongo", "sql", "jdbc", "persist", "persistence",
+            "entity", "prisma", "jpa", "hibernate", "model", "orm", "query",
+            "cache", "redis", "mapper", "migration",
         )
     ):
-        # keep more specific types when possible
         if "cache" in l or "redis" in l:
             return ("cache", 3, "Cache/data access")
         if "db" in l or "database" in l:
             return ("database", 3, "Database/data access")
         return ("repository", 3, "Data access")
 
-    # Infrastructure layer
-    if any(k in l for k in ("client", "sdk", "adapter", "queue", "kafka", "rabbit", "s3", "storage", "mailer", "logger", "metrics", "config", "external")):
-        if any(k in l for k in ("queue", "kafka", "rabbit")):
-            return ("queue", 4, "Messaging/queue infrastructure")
-        if any(k in l for k in ("storage", "s3")):
-            return ("storage", 4, "Storage infrastructure")
-        return ("client", 4, "External/infrastructure integration")
+    # ── Presentation layer ──────────────────────────────────────────────────────
+    if any(k in l for k in ("controller", "router", "handler", "ui", "view", "page", "screen", "frontend", "gateway", "endpoint")):
+        return ("controller", 1, "Presentation/API surface")
+    # "api" alone is weak — only classify as presentation when combined with endpoint keywords
+    if "api" in l and any(k in l for k in ("controller", "router", "gateway", "endpoint", "server", "rest", "graphql")):
+        return ("controller", 1, "Presentation/API surface")
 
-    # Default business layer
-    if any(k in l for k in ("service", "manager", "usecase", "use_case", "domain", "policy", "workflow")):
+    # ── Business layer (default) ────────────────────────────────────────────────
+    if any(k in l for k in ("service", "manager", "usecase", "use_case", "domain", "policy", "workflow", "orchestrat", "facade")):
         return ("service", 2, "Business logic")
 
-    return ("component", 2, _smart_label(raw))
+    return ("component", 2, "Component")
 
 
 def parse_mermaid_to_graph(text: str) -> dict:
@@ -99,8 +93,9 @@ def parse_mermaid_to_graph(text: str) -> dict:
         A["Label"] -->|label| B["Label"]
         A[Label] --> B[Label]
     """
-    nodes = {}
-    edges = []
+    nodes: dict = {}
+    edges: list = []
+    current_subgraph_layer: str | None = None  # layer inferred from subgraph title
 
     # Extract mermaid block
     mermaid_match = re.search(r"```mermaid\s*([\s\S]*?)```", text, re.IGNORECASE)
@@ -109,68 +104,92 @@ def parse_mermaid_to_graph(text: str) -> dict:
 
     mermaid_code = mermaid_match.group(1).strip()
 
-    # Step 1: collect node labels — matches A["Label"] or A[Label]
-    node_label_re = re.compile(r'(\w+)\[["\'"]?([^"\'\]\[]+)["\'"]?\]')
+    node_label_re = re.compile(r'(\w+)\[["\'"]?([^"\'"\]\[]+)["\'"]?\]')
+    node_paren_re = re.compile(r"(\w+)\(([^)]*)\)")
 
-    def get_or_create(node_id: str, hint_label: str = None):
+    # Resolve a subgraph title to a canonical layer name
+    _SUBGRAPH_LAYER_MAP = {
+        "presentation": "presentation", "ui": "presentation", "api": "presentation",
+        "business": "business", "domain": "business", "logic": "business",
+        "data": "data", "persistence": "data", "repository": "data", "database": "data",
+        "infrastructure": "infrastructure", "infra": "infrastructure",
+        "integration": "infrastructure", "platform": "infrastructure",
+    }
+
+    def _title_to_layer(title: str) -> str | None:
+        t = title.strip().strip('"\'').lower()
+        if t in _SUBGRAPH_LAYER_MAP:
+            return _SUBGRAPH_LAYER_MAP[t]
+        for k, v in _SUBGRAPH_LAYER_MAP.items():
+            if k in t:
+                return v
+        return None
+
+    def get_or_create(node_id: str, hint_label: str = None,
+                      forced_layer: str | None = None):
         label = hint_label.strip() if hint_label else node_id
         if node_id not in nodes:
             ntype, group, desc = _classify_component(label)
+            layer = forced_layer or _layer_from_type(ntype)
             nodes[node_id] = {
-                "id": node_id,
-                "label": label,
-                "type": ntype,
-                "layer": _layer_from_type(ntype),
-                "description": desc,
-                "group": group,
+                "id": node_id, "label": label, "type": ntype,
+                "layer": layer, "description": desc, "group": group,
             }
-        elif hint_label:
-            nodes[node_id]["label"] = label
-            ntype, group, desc = _classify_component(label)
-            nodes[node_id]["type"] = ntype
-            nodes[node_id]["layer"] = _layer_from_type(ntype)
-            nodes[node_id]["description"] = desc
-            nodes[node_id]["group"] = group
-
-    node_paren_re = re.compile(r"(\w+)\(([^)]*)\)")
+        else:
+            if hint_label:
+                nodes[node_id]["label"] = label
+                ntype, group, desc = _classify_component(label)
+                nodes[node_id].update({"type": ntype, "description": desc, "group": group})
+            # Subgraph layer is authoritative — always overwrite when inside a subgraph
+            if forced_layer:
+                nodes[node_id]["layer"] = forced_layer
+            elif not nodes[node_id].get("layer"):
+                nodes[node_id]["layer"] = _layer_from_type(nodes[node_id].get("type", ""))
 
     for line in mermaid_code.splitlines():
         line = line.strip()
         low = line.lower()
-        if not line or low.startswith(("graph", "flowchart", "subgraph", "end", "%%", "direction")):
+        if not line or low.startswith(("graph", "flowchart", "%%", "direction")):
             continue
 
-        # Collect node label hints from this line BEFORE stripping
+        # ── Subgraph boundary tracking ────────────────────────────────────────
+        if low.startswith("subgraph"):
+            title = re.sub(r"^subgraph\s*", "", line, flags=re.IGNORECASE).strip()
+            current_subgraph_layer = _title_to_layer(title)
+            continue
+        if low.strip() == "end":
+            current_subgraph_layer = None
+            continue
+
+        # Collect node label hints BEFORE stripping brackets
         for nid, nlabel in node_label_re.findall(line):
-            get_or_create(nid, nlabel)
+            get_or_create(nid, nlabel, current_subgraph_layer)
         for nid, nlabel in node_paren_re.findall(line):
             if "-->" in nlabel or "==>" in nlabel:
                 continue
-            get_or_create(nid, nlabel.strip())
+            get_or_create(nid, nlabel.strip(), current_subgraph_layer)
 
-        # Strip ALL bracket groups so A["My Class"] --> B["Base"] becomes A --> B
-        clean = re.sub(r"\[\[.*?\]\]", "", line)  # mermaid [[rounded]]
-        clean = re.sub(r"\(\([^)]*\)\)", "", clean)  # ((stadium))
-        clean = re.sub(r"\([^)]*\)", "", clean)  # (round)
-        clean = re.sub(r'\[.*?\]', '', clean)  # remove [...]
-        # Also strip trailing > that some LLMs emit after |label|>
+        # Strip bracket groups → A["My Class"] --> B becomes A --> B
+        clean = re.sub(r"\[\[.*?\]\]", "", line)
+        clean = re.sub(r"\(\([^)]*\)\)", "", clean)
+        clean = re.sub(r"\([^)]*\)", "", clean)
+        clean = re.sub(r'\[.*?\]', '', clean)
         clean = clean.replace("|>", "|").replace("->|", "--|")
 
-        # Match edges: SRC -->|label| TGT  or  SRC --> TGT
         edge_match = re.match(
-            r'\s*(\w+)\s*'                                  # source
-            r'(?:-->|==>|==|-.-?>?|--[->]|---)\s*'          # arrow (tolerant)
-            r'(?:\|([^|]*)\|>?\s*)?'                        # optional |label| or |label|>
-            r'(\w+)',                                        # target
+            r'\s*(\w+)\s*'
+            r'(?:-->|==>|==|-.-?>?|--[-|>]|---)\s*'
+            r'(?:\|([^|]*)\|>?\s*)?'
+            r'(\w+)',
             clean
         )
         if edge_match:
             src   = edge_match.group(1)
-            label = (edge_match.group(2) or "uses").strip()
+            lbl   = (edge_match.group(2) or "uses").strip()
             tgt   = edge_match.group(3)
-            get_or_create(src)
-            get_or_create(tgt)
-            edges.append({"source": src, "target": tgt, "label": label})
+            get_or_create(src, forced_layer=current_subgraph_layer)
+            get_or_create(tgt, forced_layer=current_subgraph_layer)
+            edges.append({"source": src, "target": tgt, "label": lbl})
 
     return {"nodes": list(nodes.values()), "edges": edges}
 
