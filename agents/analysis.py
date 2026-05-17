@@ -1,131 +1,86 @@
 """
-Architecture Analysis Agent (Greenfield + Brownfield)
-
-Produces a professional `analysis_report` that the Architecture/Planning agent
-can consume. This enables true orchestration:
-  greenfield: analysis -> architecture
-  brownfield: code -> analysis -> architecture
+Architecture Analysis Agent — compact structured discovery (minimal narrative tokens).
 """
 
-import os
-from dotenv import load_dotenv
-
+from agents.api_errors import ApiKeyError
+from agents.llm_utils import (
+    MAX_TOKENS_BROWNFIELD,
+    MAX_TOKENS_GREENFIELD,
+    MAX_TOKENS_NARRATIVE,
+    get_llm,
+    invoke_with_fallback,
+    structured_invoke,
+)
+from agents.output_schemas import AnalysisInsightOutput
 from agents.state import AgentState
 from agents.utils import PROMPT_GROUNDING
 
-load_dotenv()
-
-groq_api_key = os.getenv("GROQ_API_KEY")
-if not groq_api_key:
-    raise ValueError("GROQ_API_KEY is not set in environment.")
-
-from langchain_groq import ChatGroq
-
-llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_api_key)
-print("[Analysis] Using Groq Cloud API for Llama-3...")
+BROWNFIELD_ANTI_HALLUCINATION = (
+    "Use only technologies, modules, folders, and files found in detected_tech_stack, "
+    "dependency_graph summary, folder_structure, key_files, detected_modules, or detected_apis. "
+    "Do not mention frameworks, databases, services, or modules unless they appear there. "
+    "If something is missing, say 'Not detected in uploaded codebase' instead of assuming."
+)
 
 
 def analysis_agent(state: AgentState) -> AgentState:
-    """
-    Generate an analysis report.
-
-    - Greenfield: analyze requirements + NFRs + risks + key decisions.
-    - Brownfield: refine the code agent output into an executive-quality report,
-      incorporating README + AST structure where present.
-    """
     mode = (state.get("mode") or "").strip().lower()
-    readme = state.get("readme_content") or ""
-    ast_summary = state.get("ast_summary") or ""
-    past_memory = state.get("past_memory") or ""
     nfr = (state.get("nfr_context") or "").strip()
-    nfr_block = f"\n--- User priorities (NFR / scale) ---\n{nfr}\n" if nfr else ""
+    nfr_block = f"\nNFR priorities:\n{nfr}\n" if nfr else ""
 
     if mode == "brownfield":
-        base = state.get("analysis_report") or ""
+        compact = (state.get("deep_brownfield_analysis") or "").strip()
+        tech = (state.get("detected_tech_stack") or "").strip()
+        readme = (state.get("readme_content") or "").strip()[:600]
         context = (
-            "MODE: brownfield\n\n"
-            "You are refining an initial architecture/code analysis into an executive-quality report.\n\n"
-            "--- README (topic) ---\n"
-            f"{readme or 'No README provided.'}\n\n"
-            "--- AST summary (structure) ---\n"
-            f"{ast_summary or 'No AST summary provided.'}\n\n"
-            "--- Initial findings (from code agent) ---\n"
-            f"{base or 'No initial findings provided.'}\n\n"
-            "--- Past architectural knowledge ---\n"
-            f"{past_memory or 'No past memory found.'}\n"
+            "MODE: brownfield (existing codebase review)\n"
+            f"README excerpt:\n{readme or 'none'}\n\n"
+            f"DETECTED_TECH_STACK (deterministic, source of truth):\n{tech or 'none'}\n\n"
+            f"COMPACT CODEBASE CONTEXT:\n{compact or 'none'}\n"
         )
+        narrative_prompt = (
+            "Brownfield software architecture reviewer. Analyze the EXISTING uploaded codebase only.\n"
+            f"{BROWNFIELD_ANTI_HALLUCINATION}\n"
+            f"{PROMPT_GROUNDING}\n"
+            f"{context}{nfr_block}\n"
+            "Focus on: actual stack, real modules, architecture risks, missing layers, refactoring priorities. "
+            "Do NOT propose a greenfield stack from scratch. "
+            "Write 8-12 evidence-based bullets; each must cite a path or manifest from the context.\n"
+        )
+        max_narr = MAX_TOKENS_BROWNFIELD
     else:
-        req = state.get("input") or ""
-        context = (
-            "MODE: greenfield\n\n"
-            "You are analyzing requirements for a new system.\n\n"
-            "--- Requirements ---\n"
-            f"{req}\n"
-            f"{nfr_block}\n"
-            "--- Past architectural knowledge ---\n"
-            f"{past_memory or 'No past memory found.'}\n"
+        req = (state.get("input") or "").strip()
+        context = f"MODE: greenfield (new project from requirements)\nREQUIREMENTS:\n{req}\n{nfr_block}\n"
+        narrative_prompt = (
+            "Greenfield software architect. Design a NEW system from requirements only.\n"
+            f"{PROMPT_GROUNDING}\n"
+            f"{context}\n"
+            "Extract domain, users, core features, data entities, constraints, NFR. "
+            "Suggest modules and stack suited to THIS domain (not a generic template). "
+            "Max 12 bullets.\n"
         )
+        max_narr = MAX_TOKENS_NARRATIVE
 
+    analysis_report = invoke_with_fallback(narrative_prompt, max_tokens=max_narr, label=mode)
+
+    extract_prompt = (
+        "Extract structured discovery JSON for THIS project only. Short strings in lists (max 8 each).\n"
+        f"{context}\n\nBULLETS:\n{analysis_report[:3000]}\n"
+    )
     if mode == "brownfield":
-        prompt = (
-            "You are a senior staff software architect specializing in brownfield modernization.\n\n"
-            f"{PROMPT_GROUNDING}\n"
-            f"{context}\n\n"
-            "Write a PROFESSIONAL analysis report in Markdown using exactly these headings:\n"
-            "## Executive Summary\n"
-            "- 4-8 bullets\n\n"
-            "## Current Codebase Faults\n"
-            "- For each fault include: Severity, Evidence, Impact\n\n"
-            "## Root Causes\n"
-            "- Explain structural causes behind top faults\n\n"
-            "## Proposed Target Architecture\n"
-            "- 1-2 short paragraphs on the improved architecture\n\n"
-            "## Old vs New Comparison\n"
-            "| Dimension | Current | Proposed | Benefit |\n"
-            "|---|---|---|---|\n\n"
-            "## Non-Functional Assessment\n"
-            "- Scalability: <0-100>/100 — <1 sentence>\n"
-            "- Performance: <0-100>/100 — <1 sentence>\n"
-            "- Maintainability: <0-100>/100 — <1 sentence>\n"
-            "- Security: <0-100>/100 — <1 sentence>\n\n"
-            "## Migration Plan\n"
-            "- 4-8 bullets with sequencing and risk controls\n\n"
-            "## Risk Analysis\n"
-            "- High: ...\n"
-            "- Medium: ...\n"
-            "- Low: ...\n\n"
-            "Constraints:\n"
-            "- Be concrete and avoid generic filler.\n"
-            "- Use the provided AST/README evidence.\n"
-            "- Keep it readable and industry-grade.\n"
-        )
-    else:
-        prompt = (
-            "You are a senior staff software architect.\n\n"
-            f"{PROMPT_GROUNDING}\n"
-            f"{context}\n\n"
-            "Write a PROFESSIONAL analysis report in Markdown using exactly these headings:\n"
-            "## Executive Summary\n"
-            "- 3-6 bullets\n\n"
-            "## Recommended Architecture\n"
-            "- 1 short paragraph\n\n"
-            "## Non-Functional Assessment\n"
-            "- Scalability: <0-100>/100 — <1 sentence>\n"
-            "- Performance: <0-100>/100 — <1 sentence>\n"
-            "- Maintainability: <0-100>/100 — <1 sentence>\n"
-            "- Security: <0-100>/100 — <1 sentence>\n"
-            "- If user NFR priorities were provided above, align scores and narrative with them.\n\n"
-            "## Key Decisions\n"
-            "- 3-6 bullets, each with 1-line rationale\n\n"
-            "## Risk Analysis\n"
-            "- High: ...\n"
-            "- Medium: ...\n"
-            "- Low: ...\n\n"
-            "Constraints:\n"
-            "- Be concrete and avoid generic filler.\n"
-            "- Keep it readable and \"industry style\".\n"
-        )
+        extract_prompt += f"\n{BROWNFIELD_ANTI_HALLUCINATION}\n"
 
-    resp = llm.invoke(prompt)
-    return {"analysis_report": (resp.content or "").strip()}
+    insights: dict = {}
+    try:
+        llm = get_llm(max_tokens=MAX_TOKENS_GREENFIELD if mode == "greenfield" else MAX_TOKENS_BROWNFIELD)
+        obj = structured_invoke(llm, AnalysisInsightOutput, extract_prompt, label=f"{mode}-insights")
+        insights = obj.model_dump() if hasattr(obj, "model_dump") else obj.dict()
+    except ApiKeyError:
+        raise
+    except Exception as exc:
+        print(f"[Analysis Agent] Structured extraction failed: {exc}")
 
+    return {
+        "analysis_report": analysis_report,
+        "analysis_insights": insights,
+    }

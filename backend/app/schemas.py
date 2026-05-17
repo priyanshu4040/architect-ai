@@ -68,5 +68,43 @@ class AnalyzeResponse(BaseModel):
     memory_used: str = ""
     warning: str = ""
     results: Optional[Dict[str, Any]] = None
+    # Mode-specific sections for frontend (greenfield or brownfield shape).
+    structured_output: Optional[Dict[str, Any]] = None
     report_document: str = ""
+    is_fallback: bool = False
+    structured_partial: bool = False
+    fallback_type: Optional[str] = None
+
+
+class RequirementsCompileRequest(BaseModel):
+    source: Literal["guided", "template"]
+    template_id: Optional[str] = None
+    answers: Optional[Dict[str, Any]] = None
+    overrides: Optional[Dict[str, Any]] = None
+
+
+class RequirementsCompileResponse(BaseModel):
+    requirement_source: str = "manual"
+    project_type: str = ""
+    users: List[str] = Field(default_factory=list)
+    functional_requirements: List[str] = Field(default_factory=list)
+    non_functional_requirements: List[str] = Field(default_factory=list)
+    preferred_stack: str = ""
+    project_level: str = ""
+    deployment_preference: str = ""
+    generated_requirement_summary: str = ""
+
+
+class ModifyArchitectureRequest(BaseModel):
+    mode: Literal["greenfield", "brownfield"]
+    current_architecture: Dict[str, Any] = Field(default_factory=dict)
+    user_change_request: str = Field(..., min_length=3)
+
+
+class ModifyArchitectureResponse(BaseModel):
+    updated_architecture: Dict[str, Any] = Field(default_factory=dict)
+    changes_applied: List[str] = Field(default_factory=list)
+    reasoning: List[str] = Field(default_factory=list)
+    impact_analysis: Dict[str, str] = Field(default_factory=dict)
+    final_summary: str = ""
 

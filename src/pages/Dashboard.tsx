@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { 
-  Bot, 
-  BrainCircuit, 
-  CheckCircle2, 
-  Clock, 
-  Loader2, 
+import {
+  Bot,
+  BrainCircuit,
+  CheckCircle2,
+  Clock,
+  Loader2,
   MessageSquare,
   ChevronRight,
   Eye
@@ -50,19 +50,19 @@ const initialAgentState: AgentState = {
 };
 
 const analysisSteps = [
-  { task: "Parsing project structure", duration: 2000 },
-  { task: "Analyzing module dependencies", duration: 2500 },
-  { task: "Identifying architecture patterns", duration: 2000 },
-  { task: "Evaluating code quality metrics", duration: 1500 },
-  { task: "Generating analysis report", duration: 1000 },
+  { task: "Parsing project structure", duration: 2},
+  { task: "Analyzing module dependencies", duration: 2 },
+  { task: "Identifying architecture patterns", duration: 2 },
+  { task: "Evaluating code quality metrics", duration: 1 },
+  { task: "Generating analysis report", duration: 1 },
 ];
 
 const planningSteps = [
-  { task: "Processing analysis insights", duration: 1500 },
-  { task: "Evaluating architecture patterns", duration: 2000 },
-  { task: "Calculating scalability projections", duration: 2000 },
-  { task: "Formulating recommendations", duration: 2500 },
-  { task: "Creating evolution roadmap", duration: 1500 },
+  { task: "Processing analysis insights", duration: 1 },
+  { task: "Evaluating architecture patterns", duration: 2 },
+  { task: "Calculating scalability projections", duration: 2 },
+  { task: "Formulating recommendations", duration: 2 },
+  { task: "Creating evolution roadmap", duration: 1 },
 ];
 
 export default function Dashboard() {
@@ -97,8 +97,8 @@ export default function Dashboard() {
 
       setAgents(prev => ({
         ...prev,
-        analysisAgent: { 
-          ...prev.analysisAgent, 
+        analysisAgent: {
+          ...prev.analysisAgent,
           status: "complete",
           currentTask: "Analysis complete",
           outputs: last?.analysis_report
@@ -138,8 +138,8 @@ export default function Dashboard() {
 
       setAgents(prev => ({
         ...prev,
-        planningAgent: { 
-          ...prev.planningAgent, 
+        planningAgent: {
+          ...prev.planningAgent,
           status: "complete",
           currentTask: "Planning complete",
           outputs: last?.architecture_plan

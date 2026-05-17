@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Brain, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ApiKeyStatusBadge } from "@/components/ApiKeyStatusBadge";
 import { useState } from "react";
 
 const navLinks = [
@@ -68,6 +69,7 @@ export function Navbar() {
 
           {/* CTA Button */}
           <div className="hidden md:flex items-center gap-2">
+            <ApiKeyStatusBadge />
             <ThemeToggle />
             <Button variant="hero" size="sm" asChild>
               <Link to="/setup">Start Planning</Link>

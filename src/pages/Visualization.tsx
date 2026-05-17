@@ -60,28 +60,6 @@ function graphToArchNodes(graph: { nodes: { id: string; label: string; type?: st
   return Array.from(byId.values());
 }
 
-const mockArchitecture: ArchNode[] = [
-  // Presentation Layer
-  { id: "p1", name: "React UI", layer: "presentation", type: "frontend", functionality: "Renders user-facing screens and sends user actions to backend APIs.", connections: ["b1", "b2"] },
-  { id: "p2", name: "API Gateway", layer: "presentation", type: "gateway", functionality: "Acts as a single entry point for API requests, routing to internal services.", connections: ["b1", "b2", "b3"] },
-  { id: "p3", name: "Auth Service", layer: "presentation", type: "auth", functionality: "Handles authentication flows such as login, token validation, and session checks.", connections: ["b2", "d1"] },
-  
-  // Business Logic
-  { id: "b1", name: "Order Service", layer: "business", type: "service", functionality: "Executes order lifecycle logic such as creation, validation, and fulfillment workflow.", risk: "high", connections: ["d1", "d2"] },
-  { id: "b2", name: "User Service", layer: "business", type: "service", functionality: "Manages user profiles, preferences, and account-related business rules.", connections: ["d1"] },
-  { id: "b3", name: "Notification", layer: "business", type: "service", functionality: "Coordinates notification events and dispatches messages through messaging infrastructure.", connections: ["i1"] },
-  { id: "b4", name: "Analytics", layer: "business", type: "service", functionality: "Computes product and usage insights from transactional and cached data.", risk: "medium", connections: ["d2", "d3"] },
-  
-  // Data Layer
-  { id: "d1", name: "User DB", layer: "data", type: "database", functionality: "Persists user entities and supports account-level read/write operations.", connections: [] },
-  { id: "d2", name: "Order DB", layer: "data", type: "database", functionality: "Stores order records and guarantees consistency for order transactions.", risk: "high", connections: [] },
-  { id: "d3", name: "Redis Cache", layer: "data", type: "cache", functionality: "Caches frequently accessed data to reduce read latency and DB load.", connections: [] },
-  
-  // Infrastructure
-  { id: "i1", name: "Message Queue", layer: "infrastructure", type: "queue", functionality: "Provides asynchronous message delivery between loosely coupled components.", connections: [] },
-  { id: "i2", name: "File Storage", layer: "infrastructure", type: "storage", functionality: "Stores and retrieves binary assets such as documents and media files.", connections: [] },
-];
-
 const layers = [
   { id: "presentation", name: "Presentation Layer", color: "from-primary/30 to-primary/10" },
   { id: "business", name: "Business Logic Layer", color: "from-accent/30 to-accent/10" },
@@ -91,12 +69,9 @@ const layers = [
 
 export default function Visualization() {
   const last = loadLastResult();
-  const analysisMode = last?.mode || null;
   const backendNodes =
     last?.graph?.nodes?.length ? graphToArchNodes(last.graph as any) : null;
-  const arch =
-    backendNodes ||
-    (analysisMode === "brownfield" ? [] : mockArchitecture);
+  const arch = backendNodes ?? [];
 
   const [selectedNode, setSelectedNode] = useState<ArchNode | null>(null);
   const [zoom, setZoom] = useState(100);
@@ -163,6 +138,15 @@ export default function Visualization() {
 
             {/* Layered Architecture View */}
             <TabsContent value="layers">
+              {arch.length === 0 && (
+                <motion.div className="glass-card p-6 mb-6 text-sm text-muted-foreground">
+                  No architecture graph from your last run. Generate a project from{" "}
+                  <Link to="/setup" className="text-primary underline">
+                    Project Setup
+                  </Link>{" "}
+                  to see real agent output here (not demo data).
+                </motion.div>
+              )}
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Main Visualization */}
                 <div className="lg:col-span-3 glass-card p-6 overflow-auto">

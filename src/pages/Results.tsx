@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   AlertTriangle, 
@@ -11,11 +12,21 @@ import {
   Zap
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { ApiErrorAlert } from "@/components/ApiErrorAlert";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { AnalyzeResults, loadLastResult } from "@/lib/api";
+import {
+  AnalyzeResponse,
+  AnalyzeResults,
+  BrownfieldStructuredOutput,
+  GreenfieldStructuredOutput,
+  loadLastResult,
+  saveLastResult,
+} from "@/lib/api";
+import { BrownfieldSections } from "@/components/results/BrownfieldSections";
+import { ModifyArchitecturePanel } from "@/components/results/ModifyArchitecturePanel";
 
 type Recommendation = {
   title: string;
@@ -261,7 +272,7 @@ function fromStructuredResults(r: AnalyzeResults) {
 }
 
 export default function Results() {
-  const last = loadLastResult();
+  const [last, setLast] = useState<AnalyzeResponse | null>(loadLastResult());
   const plan = last?.architecture_plan || "";
   const report = last?.analysis_report || "";
 
@@ -294,6 +305,40 @@ export default function Results() {
               Comprehensive recommendations and insights from our AI agents
             </p>
           </motion.div>
+
+          {last?.is_fallback && last.fallback_type !== "structured_partial" && (
+            <ApiErrorAlert
+              className="mb-8"
+              title={
+                last.fallback_type === "parser_only"
+                  ? "Parser-only results"
+                  : "Analysis unavailable"
+              }
+              message={
+                (last.structured_output as { message?: string } | undefined)?.message ||
+                last.warning ||
+                "Re-run analysis after fixing API keys or backend errors."
+              }
+            />
+          )}
+
+          {(last?.structured_partial ||
+            last?.fallback_type === "structured_partial") &&
+            !last?.is_fallback && (
+              <div className="glass-card p-4 mb-8 border border-primary/30 text-sm text-muted-foreground">
+                {(last.structured_output as { message?: string } | undefined)?.message ||
+                  "Narrative architecture review is available; structured sections use parser data where needed."}
+              </div>
+            )}
+
+          {last?.warning &&
+            !last.is_fallback &&
+            !last.structured_partial &&
+            last.fallback_type !== "structured_partial" && (
+            <div className="glass-card p-4 mb-8 border border-amber-500/40 text-sm text-muted-foreground">
+              {last.warning}
+            </div>
+          )}
 
           {!last && (
             <div className="glass-card p-6 mb-8">
@@ -468,6 +513,29 @@ export default function Results() {
               </div>
             </motion.div>
           </div>
+
+          {last?.mode === "brownfield" && last.structured_output && (
+            <BrownfieldSections data={last.structured_output as BrownfieldStructuredOutput} />
+          )}
+
+          {last?.mode === "greenfield" && last.structured_output && (
+            <section className="glass-card p-6 mb-8">
+              <h2 className="text-lg font-semibold mb-2">Suggested Architecture</h2>
+              <pre className="text-xs overflow-auto text-muted-foreground whitespace-pre-wrap">
+                {JSON.stringify(last.structured_output as GreenfieldStructuredOutput, null, 2)}
+              </pre>
+            </section>
+          )}
+
+          {last && (
+            <ModifyArchitecturePanel
+              result={last}
+              onUpdated={(next) => {
+                setLast(next);
+                saveLastResult(next);
+              }}
+            />
+          )}
 
           {/* Action Buttons */}
           <motion.div

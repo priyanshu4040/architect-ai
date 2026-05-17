@@ -1,0 +1,237 @@
+"""
+Predefined greenfield project templates (domain, users, FR/NFR, modules, entities).
+"""
+
+from typing import Any, Dict, List
+
+TEMPLATES: Dict[str, Dict[str, Any]] = {
+    "ecommerce": {
+        "name": "E-commerce Web App",
+        "project_type": "E-commerce",
+        "users": ["Customer", "Admin", "Seller"],
+        "functional_requirements": [
+            "Product catalog with categories and search",
+            "Shopping cart and checkout",
+            "Order tracking and order history",
+            "Admin dashboard for products and orders",
+            "Payment integration",
+            "User registration and profile",
+        ],
+        "non_functional_requirements": [
+            "Handle peak sale traffic with horizontal scaling",
+            "Secure payment and PII handling (PCI-aware design)",
+            "99.9% availability for checkout path",
+        ],
+        "modules": ["Catalog", "Cart", "Orders", "Payments", "Admin", "Notifications"],
+        "database_entities": ["User", "Product", "Category", "Cart", "Order", "Payment", "Inventory"],
+        "preferred_stack": "MERN or Next.js + Node API",
+        "project_level": "Startup MVP",
+        "deployment_preference": "Cloud + Docker",
+    },
+    "food-ordering": {
+        "name": "Food Ordering System",
+        "project_type": "Food Ordering",
+        "users": ["Customer", "Restaurant", "Delivery Agent", "Admin"],
+        "functional_requirements": [
+            "Restaurant and menu browsing",
+            "Real-time order placement and status",
+            "Delivery assignment and tracking",
+            "Ratings and reviews",
+            "Admin analytics",
+        ],
+        "non_functional_requirements": [
+            "Low-latency order updates",
+            "Mobile-friendly responsive UI",
+            "Role-based access control",
+        ],
+        "modules": ["Restaurants", "Orders", "Delivery", "Payments", "Reviews", "Admin"],
+        "database_entities": ["User", "Restaurant", "MenuItem", "Order", "Delivery", "Payment"],
+        "preferred_stack": "React + FastAPI or MERN",
+        "project_level": "Final Year Project",
+        "deployment_preference": "Cloud",
+    },
+    "lms": {
+        "name": "Learning Management System",
+        "project_type": "LMS",
+        "users": ["Student", "Teacher", "Admin"],
+        "functional_requirements": [
+            "Course creation and enrollment",
+            "Video/content lessons and quizzes",
+            "Progress tracking and certificates",
+            "Discussion forums",
+            "Assignment submission and grading",
+        ],
+        "non_functional_requirements": [
+            "Support 5k concurrent learners",
+            "Accessible UI (WCAG basics)",
+            "Audit trail for grades",
+        ],
+        "modules": ["Courses", "Enrollment", "Assessments", "Forums", "Certificates", "Admin"],
+        "database_entities": ["User", "Course", "Lesson", "Enrollment", "Quiz", "Submission", "Grade"],
+        "preferred_stack": "React + Django or Spring Boot",
+        "project_level": "Enterprise System",
+        "deployment_preference": "Docker",
+    },
+    "banking-fraud": {
+        "name": "Banking / Fraud Detection System",
+        "project_type": "Banking / FinTech",
+        "users": ["Customer", "Bank Officer", "Fraud Analyst", "Admin"],
+        "functional_requirements": [
+            "Account dashboard and transactions",
+            "Fraud rule engine and alerts",
+            "Case management for analysts",
+            "KYC onboarding workflow",
+            "Reporting and compliance exports",
+        ],
+        "non_functional_requirements": [
+            "Strong encryption and audit logging",
+            "Sub-second fraud scoring latency",
+            "Regulatory compliance (data retention)",
+        ],
+        "modules": ["Accounts", "Transactions", "FraudEngine", "Cases", "KYC", "Reporting"],
+        "database_entities": ["Customer", "Account", "Transaction", "Alert", "Case", "AuditLog"],
+        "preferred_stack": "Spring Boot + React",
+        "project_level": "Enterprise System",
+        "deployment_preference": "Cloud (private VPC)",
+    },
+    "hospital": {
+        "name": "Hospital Management System",
+        "project_type": "Healthcare",
+        "users": ["Patient", "Doctor", "Nurse", "Receptionist", "Admin"],
+        "functional_requirements": [
+            "Patient registration and appointments",
+            "Doctor schedules and prescriptions",
+            "Billing and insurance",
+            "Lab reports upload/view",
+            "Ward/bed management",
+        ],
+        "non_functional_requirements": [
+            "HIPAA-style data protection",
+            "High availability for appointment booking",
+            "Backup and disaster recovery",
+        ],
+        "modules": ["Patients", "Appointments", "Billing", "Pharmacy", "Labs", "Admin"],
+        "database_entities": ["Patient", "Doctor", "Appointment", "Prescription", "Bill", "LabReport"],
+        "preferred_stack": "React + FastAPI or Django",
+        "project_level": "Enterprise System",
+        "deployment_preference": "Cloud",
+    },
+    "restaurant-billing": {
+        "name": "Restaurant Website + Billing",
+        "project_type": "Restaurant",
+        "users": ["Customer", "Cashier", "Manager"],
+        "functional_requirements": [
+            "Digital menu and table ordering",
+            "POS billing and split bills",
+            "Kitchen order queue",
+            "Inventory for ingredients",
+            "Daily sales reports",
+        ],
+        "non_functional_requirements": [
+            "Works offline briefly for POS",
+            "Fast checkout under 2s",
+            "Simple UI for staff",
+        ],
+        "modules": ["Menu", "Orders", "Billing", "Kitchen", "Inventory", "Reports"],
+        "database_entities": ["Table", "Order", "MenuItem", "Bill", "Payment", "InventoryItem"],
+        "preferred_stack": "React + Node/Express",
+        "project_level": "Mini Project",
+        "deployment_preference": "Local + optional cloud",
+    },
+    "event-booking": {
+        "name": "Event Booking System",
+        "project_type": "Event Booking",
+        "users": ["Attendee", "Organizer", "Admin"],
+        "functional_requirements": [
+            "Event listing and seat selection",
+            "Ticket purchase and QR check-in",
+            "Organizer event management",
+            "Email notifications",
+            "Refund policy handling",
+        ],
+        "non_functional_requirements": [
+            "Prevent double booking (concurrency)",
+            "Scalable ticket sales spikes",
+            "Secure payment flow",
+        ],
+        "modules": ["Events", "Tickets", "Payments", "CheckIn", "Organizer", "Admin"],
+        "database_entities": ["Event", "Venue", "Seat", "Ticket", "Order", "User"],
+        "preferred_stack": "Next.js full-stack or React + API",
+        "project_level": "Startup MVP",
+        "deployment_preference": "Vercel/Cloud",
+    },
+    "portfolio-blog": {
+        "name": "Portfolio + Blog Website",
+        "project_type": "Portfolio / CMS",
+        "users": ["Visitor", "Author/Admin"],
+        "functional_requirements": [
+            "Portfolio projects showcase",
+            "Blog posts with tags",
+            "Contact form",
+            "Admin CMS for content",
+            "SEO-friendly pages",
+        ],
+        "non_functional_requirements": [
+            "Fast static page loads",
+            "Basic SEO and OpenGraph",
+            "Low hosting cost",
+        ],
+        "modules": ["Portfolio", "Blog", "Contact", "CMS", "Media"],
+        "database_entities": ["Post", "Project", "Tag", "ContactMessage", "MediaAsset"],
+        "preferred_stack": "Next.js or React + headless CMS",
+        "project_level": "Mini Project",
+        "deployment_preference": "Netlify/Vercel",
+    },
+    "inventory": {
+        "name": "Inventory Management System",
+        "project_type": "Inventory / ERP-lite",
+        "users": ["Warehouse Staff", "Manager", "Admin"],
+        "functional_requirements": [
+            "SKU and stock level tracking",
+            "Purchase orders and suppliers",
+            "Stock alerts and reorder points",
+            "Barcode/scan support",
+            "Reports and exports",
+        ],
+        "non_functional_requirements": [
+            "Accurate concurrent stock updates",
+            "Role-based permissions",
+            "Audit log for stock changes",
+        ],
+        "modules": ["Inventory", "Suppliers", "PurchaseOrders", "Alerts", "Reports", "Admin"],
+        "database_entities": ["SKU", "Warehouse", "StockLevel", "Supplier", "PurchaseOrder", "AuditLog"],
+        "preferred_stack": "React + Spring Boot or FastAPI",
+        "project_level": "Final Year Project",
+        "deployment_preference": "Docker",
+    },
+    "chat-app": {
+        "name": "Chat Application",
+        "project_type": "Real-time Chat",
+        "users": ["User", "Admin"],
+        "functional_requirements": [
+            "1:1 and group messaging",
+            "Online presence and typing indicators",
+            "Media/file sharing",
+            "User search and friend requests",
+            "Moderation tools",
+        ],
+        "non_functional_requirements": [
+            "Low message latency (<300ms)",
+            "WebSocket scalability",
+            "End-to-end encryption optional",
+        ],
+        "modules": ["Auth", "Chat", "Presence", "Media", "Moderation", "Notifications"],
+        "database_entities": ["User", "Conversation", "Message", "Membership", "MediaFile"],
+        "preferred_stack": "React + Node (Socket.io) or Firebase",
+        "project_level": "Final Year Project",
+        "deployment_preference": "Cloud",
+    },
+}
+
+
+def list_templates() -> List[Dict[str, str]]:
+    return [{"id": k, "name": v["name"]} for k, v in TEMPLATES.items()]
+
+
+def get_template(template_id: str) -> Dict[str, Any] | None:
+    return TEMPLATES.get(template_id)

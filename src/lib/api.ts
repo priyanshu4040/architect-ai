@@ -1,3 +1,9 @@
+import {
+  throwIfApiError,
+  type ApiKeyStatusResponse,
+  type ApiKeyValidateResponse,
+} from "@/lib/apiErrors";
+
 export type AnalyzeMode = "greenfield" | "brownfield";
 
 export interface GraphNode {
@@ -21,6 +27,144 @@ export interface GraphPayload {
   edges: GraphEdge[];
 }
 
+export interface GreenfieldStructuredOutput {
+  project_summary: string;
+  detected_domain: string;
+  assumptions?: string[];
+  functional_requirements: string[];
+  non_functional_requirements: string[];
+  suggested_architecture: {
+    frontend: string;
+    backend: string;
+    database: string;
+    authentication: string;
+    deployment: string;
+  };
+  modules: string[];
+  api_suggestions: string[];
+  database_entities: string[];
+  security_suggestions: string[];
+  scalability_suggestions: string[];
+  architecture_flow: string[];
+  final_summary: string;
+}
+
+export interface DetectedStack {
+  frontend?: string;
+  backend?: string;
+  database?: string;
+  authentication?: string;
+  deployment?: string[];
+  api_style?: string;
+}
+
+export interface FolderAnalysisItem {
+  folder: string;
+  purpose: string;
+  quality: string;
+  suggestion: string;
+}
+
+export interface DetectedModuleItem {
+  name: string;
+  type?: string;
+  path?: string;
+  evidence?: string;
+  confidence?: string;
+}
+
+export interface SuggestedModuleItem {
+  name: string;
+  reason?: string;
+  priority?: string;
+}
+
+export interface DetectedApiItem {
+  method: string;
+  path: string;
+  file: string;
+  purpose: string;
+  evidence?: string;
+}
+
+export interface IssueItem {
+  issue: string;
+  severity: string;
+  reason: string;
+  suggested_fix: string;
+  affected_area?: string;
+  evidence?: string;
+  affected_file_or_folder?: string;
+}
+
+export interface EvolutionPlan {
+  immediate_fixes: string[];
+  short_term_improvements: string[];
+  long_term_improvements: string[];
+}
+
+export interface DetectedTechStackDetail {
+  languages?: string[];
+  language_percentages?: Record<string, number>;
+  frameworks?: string[];
+  libraries?: string[];
+  databases?: string[];
+  build_tools?: string[];
+  deployment?: string[];
+  package_managers?: string[];
+  evidence?: Record<string, string[]>;
+  confidence?: Record<string, string>;
+  folder_structure?: string[];
+  validation_message?: string;
+}
+
+export interface BrownfieldStructuredOutput {
+  project_summary: string;
+  detected_tech_stack?: DetectedTechStackDetail;
+  detected_stack: DetectedStack | string[];
+  folder_analysis: FolderAnalysisItem[] | string[];
+  detected_modules: DetectedModuleItem[] | string[];
+  suggested_modules?: SuggestedModuleItem[];
+  detected_apis: DetectedApiItem[] | string[];
+  architecture_issues: IssueItem[] | string[];
+  security_issues: IssueItem[] | string[];
+  scalability_issues: IssueItem[] | string[];
+  maintainability_issues?: IssueItem[] | string[];
+  improvement_suggestions: string[];
+  evolution_plan: EvolutionPlan | string[];
+  final_summary: string;
+  is_fallback?: boolean;
+  structured_partial?: boolean;
+  fallback_type?: string;
+  message?: string;
+  fallback_reason?: string;
+}
+
+export interface RequirementsCompileResponse {
+  requirement_source: string;
+  project_type: string;
+  users: string[];
+  functional_requirements: string[];
+  non_functional_requirements: string[];
+  preferred_stack: string;
+  project_level: string;
+  deployment_preference: string;
+  generated_requirement_summary: string;
+}
+
+export interface ModifyArchitectureResponse {
+  updated_architecture: AnalyzeResponse;
+  changes_applied: string[];
+  reasoning: string[];
+  impact_analysis: Record<string, string>;
+  final_summary: string;
+}
+
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+}
+
 export interface AnalyzeResponse {
   mode: AnalyzeMode;
   analysis_report: string;
@@ -30,7 +174,11 @@ export interface AnalyzeResponse {
   memory_used: string;
   warning: string;
   results?: AnalyzeResults | null;
+  structured_output?: GreenfieldStructuredOutput | BrownfieldStructuredOutput | null;
   report_document?: string;
+  is_fallback?: boolean;
+  structured_partial?: boolean;
+  fallback_type?: string | null;
 }
 
 export type AnalyzeResults = {
@@ -142,13 +290,7 @@ async function analyzeViaApiAnalyze(req: AnalyzeRequest): Promise<AnalyzeRespons
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw Object.assign(new Error(text || `Request failed: ${res.status}`), {
-      status: res.status,
-      body: text,
-    });
-  }
+  await throwIfApiError(res);
   return (await res.json()) as AnalyzeResponse;
 }
 
@@ -159,10 +301,7 @@ async function analyzeViaPlannerGreenfield(req: AnalyzeRequest): Promise<Analyze
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Request failed: ${res.status}`);
-  }
+  await throwIfApiError(res);
 
   const data = (await res.json()) as PlannerGreenfieldResponse;
   const s = data.suggestion;
@@ -219,14 +358,27 @@ export async function analyzeBrownfieldZip(file: File): Promise<AnalyzeResponse>
     method: "POST",
     body: fd,
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw Object.assign(new Error(text || `Request failed: ${res.status}`), {
-      status: res.status,
-      body: text,
-    });
-  }
+  await throwIfApiError(res);
   return (await res.json()) as AnalyzeResponse;
+}
+
+export async function fetchApiKeyStatus(): Promise<ApiKeyStatusResponse> {
+  const res = await fetch(`${API_BASE}/api/api-key/status`);
+  await throwIfApiError(res);
+  return (await res.json()) as ApiKeyStatusResponse;
+}
+
+export async function validateApiKey(apiKey?: string): Promise<ApiKeyValidateResponse> {
+  const res = await fetch(`${API_BASE}/api/api-key/validate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(apiKey?.trim() ? { api_key: apiKey.trim() } : {}),
+  });
+  const data = (await res.json()) as ApiKeyValidateResponse;
+  if (!res.ok && !data.message) {
+    await throwIfApiError(res);
+  }
+  return data;
 }
 
 const LAST_RESULT_KEY = "architect_ai:last_result";
@@ -245,10 +397,79 @@ export function loadLastResult(): AnalyzeResponse | null {
   }
 }
 
+export function clearLastResult(): void {
+  sessionStorage.removeItem(LAST_RESULT_KEY);
+}
+
 export interface NfrSuggestResponse {
   improved_prompt: string;
   suggestions: string[];
   reasoning: string;
+}
+
+export async function listTemplates(): Promise<ProjectTemplate[]> {
+  const res = await fetch(`${API_BASE}/api/templates`);
+  if (!res.ok) throw new Error("Failed to load templates");
+  const data = (await res.json()) as { templates: ProjectTemplate[] };
+  return data.templates;
+}
+
+export async function getTemplate(id: string): Promise<Record<string, unknown>> {
+  const res = await fetch(`${API_BASE}/api/templates/${id}`);
+  if (!res.ok) throw new Error("Template not found");
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function compileRequirements(body: {
+  source: "guided" | "template";
+  template_id?: string;
+  answers?: Record<string, unknown>;
+  overrides?: Record<string, unknown>;
+}): Promise<RequirementsCompileResponse> {
+  const res = await fetch(`${API_BASE}/api/requirements/compile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  await throwIfApiError(res);
+  return (await res.json()) as RequirementsCompileResponse;
+}
+
+export async function modifyArchitecture(body: {
+  mode: AnalyzeMode;
+  current_architecture: AnalyzeResponse;
+  user_change_request: string;
+}): Promise<ModifyArchitectureResponse> {
+  const res = await fetch(`${API_BASE}/api/modify-architecture`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  await throwIfApiError(res);
+  return (await res.json()) as ModifyArchitectureResponse;
+}
+
+const MOD_HISTORY_KEY = "architect_ai:mod_history";
+
+export function appendModificationHistory(entry: {
+  request: string;
+  response: ModifyArchitectureResponse;
+  at: string;
+}) {
+  const raw = sessionStorage.getItem(MOD_HISTORY_KEY);
+  const list = raw ? (JSON.parse(raw) as unknown[]) : [];
+  list.push(entry);
+  sessionStorage.setItem(MOD_HISTORY_KEY, JSON.stringify(list.slice(-20)));
+}
+
+export function loadModificationHistory(): unknown[] {
+  const raw = sessionStorage.getItem(MOD_HISTORY_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as unknown[];
+  } catch {
+    return [];
+  }
 }
 
 export async function suggestNfr(params: {
@@ -263,9 +484,6 @@ export async function suggestNfr(params: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Request failed: ${res.status}`);
-  }
+  await throwIfApiError(res);
   return (await res.json()) as NfrSuggestResponse;
 }

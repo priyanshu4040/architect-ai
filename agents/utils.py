@@ -4,16 +4,16 @@ Utility functions for the system.
 
 import os
 
-# Shared LLM grounding: reduces generic/hallucinated component names.
+# Concise shared rules (kept short to save prompt tokens).
 PROMPT_GROUNDING = (
-    "IMPORTANT: Only suggest components that are DIRECTLY related to the following project.\n"
-    "Do NOT invent unrelated generic names (for example random UserService, DatabaseManager, "
-    "ControllerBase, or AdapterX) unless the requirements, AST summary, or README clearly imply them.\n"
-    "All component names must be traceable to the requirements, structural summary, or README below.\n"
+    "Be specific to the input. Justify choices for THIS project. "
+    "No generic 'use React and Node' without domain reasoning. "
+    "Brownfield: only list detected items with file-path evidence; suggestions go in suggested_modules."
 )
 
+
 def read_codebase(path: str) -> str:
-    """Reads a file or a whole directory of code files into a single string."""
+    """Reads code files — avoid using full dump for brownfield LLM (use compact parser summary)."""
     if not os.path.exists(path):
         return ""
 
@@ -24,15 +24,13 @@ def read_codebase(path: str) -> str:
         except Exception as e:
             return f"Error reading file {path}: {e}"
 
-    # If it's a directory, read all common code files
     allowed_exts = {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".cpp", ".c", ".h", ".go", ".rs", ".cs", ".rb", ".php"}
     code_content = []
-    
+
     for root, _, files in os.walk(path):
-        # skip hidden dirs or common virtual envs/node_modules
-        if any(part.startswith('.') for part in root.split(os.sep)) or "node_modules" in root or "venv" in root or "__pycache__" in root:
+        if any(part.startswith(".") for part in root.split(os.sep)) or "node_modules" in root or "venv" in root or "__pycache__" in root:
             continue
-            
+
         for file in files:
             ext = os.path.splitext(file)[1].lower()
             if ext in allowed_exts:
@@ -42,6 +40,6 @@ def read_codebase(path: str) -> str:
                         rel_path = os.path.relpath(file_path, path)
                         code_content.append(f"--- FILE: {rel_path} ---\n{f.read()}\n")
                 except Exception:
-                    pass # ignore unreadable files
+                    pass
 
     return "\n".join(code_content)

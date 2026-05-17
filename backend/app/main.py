@@ -1,14 +1,29 @@
 import os
 import tempfile
 import zipfile
-from typing import List
+from typing import List, Optional
 
-from fastapi import File, UploadFile
+from fastapi import File, Request, UploadFile
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pydantic import BaseModel
+
+from langchain_groq import ChatGroq
+
+from agents.api_errors import (
+    GROQ_DEFAULT_MODEL,
+    ApiKeyError,
+    classify_llm_error,
+    mask_key,
+    normalize_api_key,
+    reraise_if_api_key_error,
+)
+from agents.llm_context import set_runtime_groq_keys
+from agents.llm_utils import groq_keys, invoke_with_fallback
+
+from .error_handlers import register_error_handlers
 
 from .schemas import (
     AnalyzeRequest,
@@ -17,8 +32,18 @@ from .schemas import (
     GreenfieldRequest,
     MemoryForgetRequest,
     MemoryTrainRequest,
+    ModifyArchitectureRequest,
+    ModifyArchitectureResponse,
+    RequirementsCompileRequest,
+    RequirementsCompileResponse,
 )
-from .service import forget_memory_by_path, run_analysis, train_memory_from_path
+from .service import (
+    compile_requirements,
+    forget_memory_by_path,
+    run_analysis,
+    run_modify_architecture,
+    train_memory_from_path,
+)
 
 
 def _split_origins(raw: str) -> List[str]:
@@ -58,10 +83,126 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+register_error_handlers(app)
+
+
+@app.middleware("http")
+async def groq_key_from_header(request: Request, call_next):
+    """Optional per-request key via X-Groq-Api-Key (overrides .env for that request)."""
+    header_key = normalize_api_key(request.headers.get("x-groq-api-key"))
+    if header_key:
+        set_runtime_groq_keys([header_key])
+        print(f"[API] {request.method} {request.url.path} — header key {mask_key(header_key)}")
+    try:
+        return await call_next(request)
+    finally:
+        if header_key:
+            set_runtime_groq_keys(None)
+
+
+class ApiKeyValidateRequest(BaseModel):
+    api_key: Optional[str] = None
+
+
+def _handle_route_error(exc: Exception, fallback_message: str) -> None:
+    """Log, classify API-key failures, or raise HTTP 500 for other errors."""
+    if isinstance(exc, ApiKeyError):
+        raise exc
+    try:
+        reraise_if_api_key_error(exc)
+    except ApiKeyError:
+        raise
+    print(f"[API] {fallback_message}: {exc}")
+    raise HTTPException(status_code=500, detail=f"{fallback_message}: {exc}") from exc
+
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/api-key/status")
+def api_key_status():
+    """
+    Lightweight status for the UI — does not call the LLM (no quota spent).
+    """
+    keys = groq_keys()
+    if not keys:
+        return {
+            "status": "missing",
+            "error_type": "API_KEY_MISSING",
+            "message": "No GROQ_API_KEY configured in backend .env.",
+            "key_count": 0,
+            "provider": "groq",
+            "model": GROQ_DEFAULT_MODEL,
+        }
+    return {
+        "status": "configured",
+        "message": f"{len(keys)} Groq API key(s) loaded (env or request header).",
+        "key_count": len(keys),
+        "provider": "groq",
+        "model": GROQ_DEFAULT_MODEL,
+        "masked_key": mask_key(keys[0]),
+    }
+
+
+@app.post("/api/api-key/validate")
+def validate_api_key(payload: ApiKeyValidateRequest = ApiKeyValidateRequest()):
+    """
+    Real Groq validation — one minimal completion. Does not log the full key.
+    """
+    body_key = normalize_api_key(payload.api_key) if payload.api_key else ""
+    if body_key:
+        set_runtime_groq_keys([body_key])
+
+    keys = groq_keys()
+    if not keys:
+        return {
+            "valid": False,
+            "error_type": "API_KEY_MISSING",
+            "message": "No API key provided. Set GROQ_API_KEY in .env or send api_key in the request body.",
+            "provider": "groq",
+            "model": GROQ_DEFAULT_MODEL,
+        }
+
+    key = keys[0]
+    print(f"[API] validate — provider=groq model={GROQ_DEFAULT_MODEL} key={mask_key(key)}")
+    try:
+        llm = ChatGroq(model=GROQ_DEFAULT_MODEL, groq_api_key=key)
+        response = llm.invoke("Reply with exactly: OK")
+        preview = ((response.content or "").strip())[:40]
+        return {
+            "valid": True,
+            "provider": "groq",
+            "model": GROQ_DEFAULT_MODEL,
+            "message": "API key is valid and accepted by Groq.",
+            "masked_key": mask_key(key),
+            "preview": preview,
+        }
+    except Exception as exc:
+        classified = classify_llm_error(exc)
+        if classified:
+            print(f"[API] validate failed — {classified.error_type}: {classified.message}")
+            return {
+                "valid": False,
+                "error_type": classified.error_type,
+                "message": classified.message,
+                "provider": "groq",
+                "model": GROQ_DEFAULT_MODEL,
+                "masked_key": mask_key(key),
+            }
+        print(f"[API] validate failed — unclassified: {type(exc).__name__}: {exc}")
+        return {
+            "valid": False,
+            "error_type": "PROVIDER_ERROR",
+            "message": str(exc)[:300],
+            "provider": "groq",
+            "model": GROQ_DEFAULT_MODEL,
+            "masked_key": mask_key(key),
+        }
+    finally:
+        if body_key:
+            set_runtime_groq_keys(None)
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
@@ -81,8 +222,10 @@ def analyze(payload: AnalyzeRequest):
         return AnalyzeResponse(**result)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ApiKeyError:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}") from exc
+        _handle_route_error(exc, "Analysis failed")
 
 
 # Backwards-compatible aliases (no /api prefix)
@@ -106,8 +249,10 @@ def greenfield(payload: GreenfieldRequest):
             growth_rate=payload.growth_rate,
         )
         return AnalyzeResponse(**result)
+    except ApiKeyError:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Greenfield failed: {exc}") from exc
+        _handle_route_error(exc, "Greenfield failed")
 
 
 @app.post("/greenfield", response_model=AnalyzeResponse)
@@ -120,8 +265,10 @@ def brownfield(payload: BrownfieldRequest):
     try:
         result = run_analysis("brownfield", payload.input)
         return AnalyzeResponse(**result)
+    except ApiKeyError:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Brownfield failed: {exc}") from exc
+        _handle_route_error(exc, "Brownfield failed")
 
 
 @app.post("/brownfield", response_model=AnalyzeResponse)
@@ -179,8 +326,10 @@ async def brownfield_zip(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except zipfile.BadZipFile as exc:
         raise HTTPException(status_code=400, detail="Invalid zip file.") from exc
+    except ApiKeyError:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Brownfield zip failed: {exc}") from exc
+        _handle_route_error(exc, "Brownfield zip failed")
 
 
 @app.post("/api/memory/train")
@@ -213,6 +362,59 @@ class NfrSuggestResponse(BaseModel):
     reasoning: str
 
 
+@app.get("/api/templates")
+def list_templates():
+    from agents.greenfield_templates import list_templates as _list
+
+    return {"templates": _list()}
+
+
+@app.get("/api/templates/{template_id}")
+def get_template(template_id: str):
+    from agents.greenfield_templates import get_template as _get
+
+    tpl = _get(template_id)
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"id": template_id, **tpl}
+
+
+@app.post("/api/requirements/compile", response_model=RequirementsCompileResponse)
+def requirements_compile(payload: RequirementsCompileRequest):
+    try:
+        result = compile_requirements(
+            payload.source,
+            template_id=payload.template_id,
+            answers=payload.answers,
+            overrides=payload.overrides,
+        )
+        return RequirementsCompileResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ApiKeyError:
+        raise
+    except Exception as exc:
+        _handle_route_error(exc, "Compile failed")
+
+
+@app.post("/api/modify-architecture", response_model=ModifyArchitectureResponse)
+@app.post("/modify-architecture", response_model=ModifyArchitectureResponse)
+def modify_architecture_route(payload: ModifyArchitectureRequest):
+    try:
+        result = run_modify_architecture(
+            payload.mode,
+            payload.current_architecture,
+            payload.user_change_request,
+        )
+        return ModifyArchitectureResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ApiKeyError:
+        raise
+    except Exception as exc:
+        _handle_route_error(exc, "Modification failed")
+
+
 @app.post("/api/suggest-nfr", response_model=NfrSuggestResponse)
 def suggest_nfr(payload: NfrSuggestRequest):
     """
@@ -220,12 +422,6 @@ def suggest_nfr(payload: NfrSuggestRequest):
     and NFR slider values and suggest concrete improvements.
     """
     import re as _re
-    from langchain_groq import ChatGroq
-
-    # Try both GROQ keys with fallback
-    groq_key = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY1")
-    if not groq_key:
-        raise HTTPException(status_code=500, detail="No GROQ_API_KEY configured.")
 
     nfr_context = (
         f"- Scalability priority: {payload.scalability}/100\n"
@@ -260,9 +456,7 @@ def suggest_nfr(payload: NfrSuggestRequest):
     )
 
     try:
-        llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_key)
-        response = llm.invoke(prompt_text)
-        text = (response.content or "").strip()
+        text = invoke_with_fallback(prompt_text)
 
         improved_prompt = ""
         suggestions = []
@@ -297,7 +491,9 @@ def suggest_nfr(payload: NfrSuggestRequest):
             reasoning=reasoning,
         )
 
+    except ApiKeyError:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Prompt suggestion failed: {exc}") from exc
+        _handle_route_error(exc, "Prompt suggestion failed")
 
 

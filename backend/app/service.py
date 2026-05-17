@@ -21,8 +21,34 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from .analyzers.compact_context import build_brownfield_llm_context
+from .analyzers.tech_stack_scanner import scan_tech_stack, tech_stack_to_detected_stack
 from .layer_reconcile import reconcile_structured_layers
 from .layers_common import normalize_layer
+
+
+def _inventory_text_to_dict(text: str) -> Dict[str, Any]:
+    """Parse generate_project_inventory() text into a shallow dict for fallbacks."""
+    out: Dict[str, Any] = {
+        "summary": (text or "")[:800],
+        "tech_stack": [],
+        "top_level_folders": [],
+        "route_hints": [],
+    }
+    for line in (text or "").split("\n"):
+        if line.startswith("Top-level folders:"):
+            out["top_level_folders"] = [
+                x.strip() for x in line.split(":", 1)[1].split(",") if x.strip()
+            ]
+        elif line.startswith("Detected stack signals:"):
+            out["tech_stack"] = [
+                x.strip() for x in line.split(":", 1)[1].split(";") if x.strip()
+            ]
+        elif line.startswith("Route/API file hints:"):
+            out["route_hints"] = [
+                x.strip() for x in line.split(":", 1)[1].split(",") if x.strip()
+            ]
+    return out
 
 
 def _fallback_greenfield_plan(requirements: str) -> str:
@@ -51,7 +77,9 @@ def _fallback_brownfield_report(user_input: str) -> str:
 def _imports() -> Dict[str, Any]:
     from langgraph.graph import StateGraph
 
-    from agents.ast_parser import generate_ast_summary
+    from agents.ast_parser import generate_ast_summary, generate_project_inventory
+    from agents.brownfield_analyzer import run_deep_brownfield_analysis
+    from agents.output_fallbacks import merge_brownfield_structured, merge_greenfield_structured
     from agents.analysis import analysis_agent
     from agents.brownfield import code_agent, generate_brownfield_component_details
     from agents.graph_builder import parse_ast_summary_to_graph, parse_mermaid_to_graph
@@ -71,6 +99,10 @@ def _imports() -> Dict[str, Any]:
         "router": router,
         "read_codebase": read_codebase,
         "generate_ast_summary": generate_ast_summary,
+        "generate_project_inventory": generate_project_inventory,
+        "merge_greenfield_structured": merge_greenfield_structured,
+        "merge_brownfield_structured": merge_brownfield_structured,
+        "run_deep_brownfield_analysis": run_deep_brownfield_analysis,
         "parse_ast_summary_to_graph": parse_ast_summary_to_graph,
         "parse_mermaid_to_graph": parse_mermaid_to_graph,
         "train_memory": train_memory,
@@ -855,6 +887,12 @@ def run_analysis(
     warning = ""
     ast_summary_text = ""
     readme_text = ""
+    project_inventory_text = ""
+    inventory_dict: Dict[str, Any] = {}
+    deep_brownfield_dict: Dict[str, Any] = {}
+    deep_brownfield_text = ""
+    detected_tech_stack: Dict[str, Any] = {}
+    detected_tech_stack_text = ""
     input_payload = user_input
     graph_data = {"nodes": [], "edges": []}
     memory_used = "No past architectural memory found."
@@ -864,6 +902,33 @@ def run_analysis(
         graph = _build_graph(mods)
     except Exception as exc:
         warning = f"Agent runtime unavailable: {exc}"
+        from agents.output_fallbacks import (
+            merge_brownfield_structured,
+            merge_greenfield_structured,
+        )
+        from agents.brownfield_analyzer import run_deep_brownfield_analysis
+
+        if mode == "brownfield" and os.path.exists(user_input):
+            detected_tech_stack = scan_tech_stack(user_input)
+            deep_only = run_deep_brownfield_analysis(user_input)
+            deep_only["detected_tech_stack"] = detected_tech_stack
+            deep_only.pop("_analysis_text", None)
+            return {
+                "mode": mode,
+                "analysis_report": "",
+                "architecture_plan": "",
+                "ast_summary": "",
+                "graph": graph_data,
+                "memory_used": memory_used,
+                "warning": warning + " Showing parser-detected summary only.",
+                "results": {},
+                "structured_output": merge_brownfield_structured(
+                    None, None, None, {}, deep_only, force_fallback=False, llm_failed=True
+                ),
+                "report_document": "",
+                "is_fallback": True,
+            }
+
         if mode == "greenfield":
             return {
                 "mode": mode,
@@ -872,7 +937,13 @@ def run_analysis(
                 "ast_summary": "",
                 "graph": graph_data,
                 "memory_used": memory_used,
-                "warning": warning,
+                "warning": warning + " Showing fallback data — agents did not run.",
+                "results": {},
+                "structured_output": merge_greenfield_structured(
+                    None, None, None, user_input, force_fallback=True
+                ),
+                "report_document": "",
+                "is_fallback": True,
             }
         return {
             "mode": mode,
@@ -881,7 +952,13 @@ def run_analysis(
             "ast_summary": "",
             "graph": graph_data,
             "memory_used": memory_used,
-            "warning": warning,
+            "warning": warning + " Showing fallback data — agents did not run.",
+            "results": {},
+            "structured_output": merge_brownfield_structured(
+                None, None, None, {}, None, force_fallback=True
+            ),
+            "report_document": "",
+            "is_fallback": True,
         }
 
     if mode == "brownfield" and os.path.exists(user_input):
@@ -890,8 +967,63 @@ def run_analysis(
             with open(readme_path, "r", encoding="utf-8") as rf:
                 readme_text = rf.read()
 
+        # Deterministic tech stack (source of truth for frameworks/languages).
+        detected_tech_stack = scan_tech_stack(user_input)
+        detected_tech_stack_text = json.dumps(detected_tech_stack, separators=(",", ":"))[:6000]
+
+        if not detected_tech_stack.get("valid", True):
+            msg = detected_tech_stack.get("validation_message") or (
+                "No clear tech stack detected. Please upload a valid source-code ZIP."
+            )
+            deep_brownfield_dict = mods["run_deep_brownfield_analysis"](user_input)
+            deep_brownfield_dict["detected_tech_stack"] = detected_tech_stack
+            return {
+                "mode": mode,
+                "analysis_report": "",
+                "architecture_plan": "",
+                "ast_summary": "",
+                "graph": graph_data,
+                "memory_used": memory_used,
+                "warning": msg,
+                "results": {},
+                "structured_output": mods["merge_brownfield_structured"](
+                    None,
+                    None,
+                    None,
+                    {},
+                    deep_brownfield_dict,
+                    force_fallback=False,
+                    llm_failed=True,
+                ),
+                "report_document": "",
+                "is_fallback": True,
+                "structured_partial": False,
+                "fallback_type": "invalid_zip",
+            }
+
         ast_summary_text = mods["generate_ast_summary"](user_input)
-        input_payload = mods["read_codebase"](user_input) or user_input
+        project_inventory_text = mods["generate_project_inventory"](user_input)
+        inventory_dict = _inventory_text_to_dict(project_inventory_text)
+        deep_brownfield_dict = mods["run_deep_brownfield_analysis"](user_input)
+        deep_brownfield_dict["detected_tech_stack"] = detected_tech_stack
+        deep_brownfield_dict["detected_stack"] = tech_stack_to_detected_stack(detected_tech_stack)
+
+        deep_brownfield_text = build_brownfield_llm_context(
+            user_input, detected_tech_stack, deep_brownfield_dict
+        )
+        deep_brownfield_dict["_analysis_text"] = deep_brownfield_text
+
+        parser_stats = deep_brownfield_dict.get("_parser_stats") or {}
+        tech_count = (detected_tech_stack.get("scan_stats") or {}).get("technologies_detected", 0)
+        print(
+            "[Brownfield scan] "
+            f"files_scanned={parser_stats.get('files_scanned', 0)} "
+            f"modules_detected={parser_stats.get('modules_detected', 0)} "
+            f"apis_detected={parser_stats.get('apis_detected', 0)} "
+            f"technologies_detected={tech_count} "
+            f"context_chars={len(deep_brownfield_text)}"
+        )
+        input_payload = user_input
         graph_data = mods["parse_ast_summary_to_graph"](ast_summary_text)
 
     search_query = input_payload if mode == "greenfield" else (ast_summary_text[:4000] or "Software architecture refactoring")
@@ -907,24 +1039,57 @@ def run_analysis(
             "readme_content": readme_text,
             "past_memory": memory_used,
             "ast_summary": ast_summary_text,
+            "project_inventory": project_inventory_text,
+            "deep_brownfield_analysis": deep_brownfield_text,
+            "detected_tech_stack": detected_tech_stack_text,
             "analysis_report": "",
+            "analysis_insights": {},
             "architecture_plan": "",
             "nfr_context": nfr_context,
+            "results": {},
+            "structured_output": {},
+            "error_state": "",
         }
     )
 
     architecture_plan = result.get("architecture_plan", "") or ""
     analysis_report = result.get("analysis_report", "") or ""
     structured_results = result.get("results") or {}
+    analysis_insights = result.get("analysis_insights") or {}
+    raw_structured_output = result.get("structured_output") or {}
+
+    # Build mode-specific structured_output with deterministic fallbacks.
+    if mode == "greenfield":
+        structured_output = mods["merge_greenfield_structured"](
+            raw_structured_output,
+            analysis_insights,
+            structured_results,
+            user_input,
+            force_fallback=False,
+            architecture_plan=architecture_plan,
+        )
+    else:
+        llm_narrative_ok = bool(analysis_report.strip() or architecture_plan.strip())
+        llm_structured_ok = bool(raw_structured_output)
+        structured_output = mods["merge_brownfield_structured"](
+            raw_structured_output,
+            analysis_insights,
+            structured_results,
+            inventory_dict,
+            deep_brownfield_dict,
+            force_fallback=False,
+            llm_failed=not llm_narrative_ok and bool(deep_brownfield_dict),
+            structured_llm_incomplete=not llm_structured_ok and llm_narrative_ok,
+        )
+
     if (not analysis_report.strip()) and structured_results:
         analysis_report = _results_to_analysis_report(structured_results)
 
-    _snippet_src = input_payload if mode == "brownfield" else user_input
-    _snippet = (_snippet_src or "").strip()
-    if len(_snippet) > 12000:
-        _snippet = _snippet[:12000]
+    # Token-saving: brownfield validation uses AST only, not full codebase text.
     validation_corpus = "\n".join(
-        [readme_text, ast_summary_text, nfr_context, _snippet]
+        [readme_text, ast_summary_text, deep_brownfield_text[:4000], nfr_context]
+        if mode == "brownfield"
+        else [user_input[:8000], nfr_context]
     )
     # Pruning: only applies in brownfield mode.
     # In greenfield, the LLM designs new class names that don't exist in the requirements text —
@@ -1016,6 +1181,21 @@ def run_analysis(
         warning=warning,
     )
 
+    fallback_type = structured_output.get("fallback_type") or ""
+    is_fallback = bool(structured_output.get("is_fallback")) and fallback_type not in (
+        "structured_partial",
+        "",
+    )
+    if structured_output.get("structured_partial") and not is_fallback:
+        partial_msg = structured_output.get("message") or ""
+        if partial_msg and partial_msg not in warning:
+            warning = (warning + " | " if warning else "") + partial_msg
+    elif is_fallback and fallback_type == "agent_unavailable":
+        if warning:
+            warning = warning + " Some sections use fallback placeholders."
+        else:
+            warning = "Some sections use fallback placeholders."
+
     return {
         "mode": mode,
         "analysis_report": analysis_report,
@@ -1025,8 +1205,56 @@ def run_analysis(
         "memory_used": memory_used,
         "warning": warning,
         "results": structured_results,
+        "structured_output": structured_output,
         "report_document": report_document,
+        "is_fallback": is_fallback,
+        "structured_partial": bool(structured_output.get("structured_partial")),
+        "fallback_type": fallback_type or None,
     }
+
+
+def compile_requirements(
+    source: str,
+    *,
+    template_id: str | None = None,
+    answers: Dict[str, Any] | None = None,
+    overrides: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Build requirement summary from guided answers or a template."""
+    from agents.requirement_builder import compile_from_guided, compile_from_template
+
+    if source == "guided":
+        out = compile_from_guided(answers or {})
+    elif source == "template":
+        if not template_id:
+            raise ValueError("template_id is required for template source")
+        out = compile_from_template(template_id, overrides)
+    else:
+        raise ValueError("source must be 'guided' or 'template'")
+    return out.model_dump() if hasattr(out, "model_dump") else out.dict()
+
+
+def run_modify_architecture(
+    mode: str,
+    current_architecture: Dict[str, Any],
+    user_change_request: str,
+) -> Dict[str, Any]:
+    """Modification Agent entry — patch existing architecture from user request."""
+    from agents.modification import modify_architecture
+
+    mode = mode.lower().strip()
+    if mode not in {"greenfield", "brownfield"}:
+        raise ValueError("mode must be 'greenfield' or 'brownfield'")
+
+    result = modify_architecture(mode, current_architecture, user_change_request)
+    updated = result.get("updated_architecture") or current_architecture
+
+    # Keep structured_output in sync when only partial update returned
+    if isinstance(updated, dict) and "structured_output" not in updated:
+        updated = {**current_architecture, **updated}
+
+    result["updated_architecture"] = updated
+    return result
 
 
 def train_memory_from_path(path: str) -> Tuple[bool, str]:

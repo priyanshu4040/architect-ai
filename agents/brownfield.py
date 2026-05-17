@@ -1,91 +1,83 @@
 """
-Code Analysis Agent (Brownfield)
-Takes existing code and returns issue detection with refactoring recommendations.
+Code Analysis Agent (Brownfield) — first pass before Analysis Agent.
 """
 
-import os
-from dotenv import load_dotenv
-
+from agents.llm_utils import invoke_with_fallback
 from agents.state import AgentState
 from agents.utils import PROMPT_GROUNDING
 
-load_dotenv()
-
-groq_api_key = os.getenv("GROQ_API_KEY1")
-if not groq_api_key:
-    raise ValueError("GROQ_API_KEY is not set in environment.")
-
-from langchain_groq import ChatGroq
-llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=groq_api_key)
-print("[Brownfield] Using Groq Cloud API for Llama-3...")
 
 def code_agent(state: AgentState) -> AgentState:
-    """
-    Brownfield Agent — takes existing code or a code description
-    and returns issue detection with refactoring recommendations.
-    """
-    print("\n[Code Analysis Agent] Reviewing existing code...")
+    print("\n[Code Analysis Agent] Reviewing existing codebase structure...")
 
-    # Pass full strings, utilizing the 128k context limits of modern instances
-    ast_summary = state.get('ast_summary') or ''
-    readme      = state.get('readme_content') or ''
-    past_memory = state.get('past_memory') or ''
+    ast_summary = state.get("ast_summary") or ""
+    readme = state.get("readme_content") or ""
+    inventory = state.get("project_inventory") or ""
+    deep = state.get("deep_brownfield_analysis") or ""
+    past_memory = state.get("past_memory") or ""
+    nfr = (state.get("nfr_context") or "").strip()
 
     prompt = f"""
-You are a principal software architecture reviewer for brownfield modernization.
+You are a principal software architect reviewing an EXISTING codebase for modernization.
 
 {PROMPT_GROUNDING}
 
-Analyze the following system:
+--- README (product context) ---
+{readme or "No README provided."}
 
---- PROJECT TOPIC / IDEA (README) ---
-{readme or 'No README provided.'}
+--- PROJECT INVENTORY (manifests, folders, route hints) ---
+{inventory or "No inventory available."}
 
---- PAST ARCHITECTURAL KNOWLEDGE (Company Standard / RAG) ---
-{past_memory or 'No past memory found.'}
+--- DEEP STATIC ANALYSIS (structure, stack, routes, security) ---
+{deep or "No deep analysis."}
 
---- AST STRUCTURAL GRAPH (Dependencies & Classes) ---
-{ast_summary or 'No structural graph available.'}
+--- AST STRUCTURAL GRAPH ---
+{ast_summary or "No AST available."}
 
-NOTE: The raw source code is intentionally omitted. Rely on the AST graph above for structural analysis.
+--- USER NFR PRIORITIES ---
+{nfr or "Not specified."}
 
-Do the following:
-1. Identify architectural issues from the AST graph (circular dependencies, tight coupling, etc.).
-2. Detect poor modularization or separation of concerns.
-3. Suggest concrete improvements referencing specific classes or imports from the graph.
-4. Recommend a better architecture if needed.
-5. Prioritize issues by severity: High / Medium / Low.
+--- PAST ARCHITECTURAL KNOWLEDGE ---
+{past_memory or "None."}
 
-Output format (strictly use these sections):
-## Current Codebase Snapshot
-- 4-8 bullets about observed structure and dependency style.
+Raw source is omitted intentionally; use inventory + AST as evidence.
 
-## Faults in Current Codebase
-- List concrete faults as bullets with: fault, evidence from AST/readme, impact.
-- Use severity labels: High / Medium / Low.
+Deliver a technical findings document with these sections:
 
-## Root Cause Analysis
-- Explain why the faults exist (module boundaries, layering violations, coupling patterns, etc.)
+## Project Type and Stack
+- Infer project type (SPA, API, monolith, microservices, etc.) from inventory/AST.
+- List detected technologies with evidence.
 
-## Refactoring and Modernization Strategy
-- List improvements mapped to affected modules/components.
-- Include migration safety considerations and sequencing.
+## Folder and Module Structure
+- Describe how code is organized; call out missing layers (domain, infra, tests).
 
-## Expected Improvements (Why this helps)
-- Explain measurable gains in maintainability, scalability, performance, security, and delivery speed.
+## APIs and Routes
+- List likely API surfaces from route file hints and controller/handler classes in AST.
+
+## Dependencies and Coupling
+- Note heavy imports, circular patterns, or god-modules if visible in AST.
+
+## Architecture Issues
+- Bullet each issue: severity (High/Medium/Low), evidence, impact.
+
+## Security and Scalability Gaps
+- Concrete gaps tied to this codebase (not generic OWASP lists).
+
+## Refactoring Strategy
+- Prioritized improvements mapped to modules/classes from AST.
 
 ## Old vs New Architecture Comparison
 | Area | Current State | Proposed State | Expected Benefit |
 |---|---|---|---|
 
-Keep answer highly concrete, technical, and actionable. Avoid generic statements.
+Avoid generic advice. Every bullet must reference inventory or AST evidence.
 """
 
-    response = llm.invoke(prompt)
+    analysis_report = invoke_with_fallback(prompt)
     print("\n[Code Analysis Agent] Analysis complete.")
-    return {"analysis_report": response.content}
+    return {"analysis_report": analysis_report}
 
 
 def generate_brownfield_component_details(*args, **kwargs) -> list[dict]:
-    # Deprecated: native json structure extraction is handled by structured output in greenfield.py
+    # Deprecated: structured extraction handled in greenfield.py architecture_agent
     return []

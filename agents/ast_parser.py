@@ -299,9 +299,9 @@ def generate_ast_summary(path: str) -> str:
                 _format_file_data(data, summary_lines)
                 file_count += 1
 
-                # Cap at 80 files to avoid overwhelming the LLM context window
-                if file_count >= 80:
-                    summary_lines.append("\n[TRUNCATED] Max file limit reached (80 files).")
+                # Token-saving: cap AST files sent to downstream context
+                if file_count >= 40:
+                    summary_lines.append("\n[TRUNCATED] Max file limit reached (40 files).")
                     break
             else:
                 continue
@@ -314,6 +314,100 @@ def generate_ast_summary(path: str) -> str:
         )
 
     return "\n".join(summary_lines)
+
+
+def generate_project_inventory(path: str) -> str:
+    """
+    Build a concise project inventory for brownfield analysis:
+    tech stack manifests, top-level folders, and route/API hints.
+    """
+    if not os.path.exists(path):
+        return ""
+
+    lines: List[str] = ["=== PROJECT INVENTORY ==="]
+    root = path if os.path.isdir(path) else os.path.dirname(path)
+    tech_stack: List[str] = []
+    route_hints: List[str] = []
+
+    manifest_files = {
+        "package.json": "Node.js/npm",
+        "pnpm-lock.yaml": "pnpm",
+        "yarn.lock": "Yarn",
+        "requirements.txt": "Python/pip",
+        "pyproject.toml": "Python (pyproject)",
+        "Pipfile": "Python/pipenv",
+        "pom.xml": "Java/Maven",
+        "build.gradle": "Java/Gradle",
+        "go.mod": "Go modules",
+        "Cargo.toml": "Rust",
+        "composer.json": "PHP/Composer",
+        "Gemfile": "Ruby",
+        "docker-compose.yml": "Docker Compose",
+        "Dockerfile": "Docker",
+    }
+
+    for fname, label in manifest_files.items():
+        fpath = os.path.join(root, fname)
+        if os.path.isfile(fpath):
+            tech_stack.append(label)
+            if fname == "package.json":
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        pkg = json.load(f)
+                    deps = list((pkg.get("dependencies") or {}).keys())[:15]
+                    dev_deps = list((pkg.get("devDependencies") or {}).keys())[:8]
+                    if deps:
+                        tech_stack.append(f"npm deps sample: {', '.join(deps)}")
+                    if dev_deps:
+                        tech_stack.append(f"npm devDeps sample: {', '.join(dev_deps)}")
+                except Exception:
+                    pass
+
+    if os.path.isdir(root):
+        top_dirs = []
+        for name in sorted(os.listdir(root))[:40]:
+            full = os.path.join(root, name)
+            if os.path.isdir(full) and not name.startswith(".") and name not in _SKIP_DIRS:
+                top_dirs.append(name)
+        if top_dirs:
+            lines.append(f"Top-level folders: {', '.join(top_dirs[:25])}")
+
+        route_dir_names = {"routes", "route", "api", "apis", "controllers", "handlers", "pages", "app"}
+        for dirpath, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if not _should_skip_dir(os.path.join(dirpath, d))]
+            if _should_skip_dir(dirpath):
+                continue
+            rel = os.path.relpath(dirpath, root).replace("\\", "/")
+            parts = set(rel.lower().split("/"))
+            if parts & route_dir_names:
+                for fn in files[:8]:
+                    if fn.endswith((".py", ".ts", ".js", ".go", ".java", ".cs")):
+                        route_hints.append(f"{rel}/{fn}")
+            if len(route_hints) >= 25:
+                break
+
+    if tech_stack:
+        lines.append("Detected stack signals: " + "; ".join(tech_stack))
+    if route_hints:
+        lines.append("Route/API file hints: " + ", ".join(route_hints[:20]))
+
+    ext_counts: Dict[str, int] = {}
+    if os.path.isdir(root):
+        for dirpath, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if not _should_skip_dir(os.path.join(dirpath, d))]
+            if _should_skip_dir(dirpath):
+                continue
+            for fn in files:
+                ext = os.path.splitext(fn)[1].lower()
+                if ext in SUPPORTED_EXTENSIONS:
+                    ext_counts[ext] = ext_counts.get(ext, 0) + 1
+            if sum(ext_counts.values()) > 200:
+                break
+    if ext_counts:
+        summary = ", ".join(f"{k}:{v}" for k, v in sorted(ext_counts.items(), key=lambda x: -x[1])[:8])
+        lines.append(f"Source file distribution: {summary}")
+
+    return "\n".join(lines)
 
 
 def _format_file_data(data: Dict, summary_lines: List[str]):
